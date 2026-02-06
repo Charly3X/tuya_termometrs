@@ -2,7 +2,7 @@
 
 A modern desktop widget for KDE Plasma 6 that displays real-time data from Tuya smart home devices including thermometers and smart plugs.
 
-![Widget Preview](https://via.placeholder.com/800x200?text=Tuya+Thermometers+Widget)
+<!-- Add screenshot here: ![Widget Preview](screenshots/widget.png) -->
 
 ## Features
 
