@@ -205,7 +205,7 @@ PlasmoidItem {
                         }
                         
                         PlasmaComponents.Label {
-                            text: "Сегодня: " + socketData.energy + " kWh"
+                            text: "Потребление: " + socketData.energy + " kWh"
                             font.pixelSize: 12
                             horizontalAlignment: Text.AlignHCenter
                             Layout.fillWidth: true
