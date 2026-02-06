@@ -106,7 +106,7 @@ def get_temperatures():
                     elif item["code"] == "cur_voltage":
                         socket_data["voltage"] = f"{item['value'] / 10:.0f}"
                     elif item["code"] == "add_ele":
-                        socket_data["energy"] = f"{item['value'] / 100:.2f}"
+                        socket_data["energy"] = f"{item['value'] / 1000:.2f}"
         except Exception as e:
             pass
     
