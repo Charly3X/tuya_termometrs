@@ -1,0 +1,18 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Tuya Widget"
+            }
+        ],
+        "Category": "Monitoring",
+        "Description": "Display Tuya thermometer data",
+        "Icon": "temperature-normal",
+        "Id": "org.kde.plasma.tuya",
+        "Name": "Tuya Thermometers",
+        "Version": "1.0",
+        "Website": ""
+    },
+    "KPackageStructure": "Plasma/Applet",
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

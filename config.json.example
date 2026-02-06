@@ -1,0 +1,11 @@
+{
+    "region": "eu",
+    "client_id": "YOUR_CLIENT_ID",
+    "client_secret": "YOUR_CLIENT_SECRET",
+    "device_id": "YOUR_DEVICE_ID",
+    "devices": [
+        "DEVICE_ID_1",
+        "DEVICE_ID_2",
+        "DEVICE_ID_3"
+    ]
+}

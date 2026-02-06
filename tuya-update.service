@@ -1,0 +1,6 @@
+[Unit]
+Description=Update Tuya thermometer data
+
+[Service]
+Type=oneshot
+ExecStart=/home/charoyan/projects/tuya/venv/bin/python3 /home/charoyan/projects/tuya/tuya_client.py
