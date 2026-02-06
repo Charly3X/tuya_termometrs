@@ -2,6 +2,7 @@
 import json
 import sys
 from pathlib import Path
+from datetime import datetime
 import tinytuya
 
 CONFIG_FILE = Path(__file__).parent / "config.json"
@@ -110,7 +111,7 @@ def get_temperatures():
         except Exception as e:
             pass
     
-    return {"temperatures": temps, "humidity": humids, "names": names, "batteries": batteries, "socket": socket_data}
+    return {"temperatures": temps, "humidity": humids, "names": names, "batteries": batteries, "socket": socket_data, "last_update": datetime.now().strftime("%H:%M:%S")}
 
 if __name__ == "__main__":
     result = get_temperatures()

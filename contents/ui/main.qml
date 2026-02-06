@@ -10,9 +10,10 @@ PlasmoidItem {
     
     property var temperatures: ["-", "-", "-"]
     property var humidity: ["-", "-", "-"]
-    property var deviceNames: ["Загрузка...", "Загрузка...", "Загрузка..."]
+    property var deviceNames: ["Loading...", "Loading...", "Loading..."]
     property var batteries: [0, 0, 0]
     property var socketData: {"name": "", "power": "--", "voltage": "--", "energy": "--"}
+    property string lastUpdate: ""
     
     preferredRepresentation: fullRepresentation
     
@@ -36,6 +37,7 @@ PlasmoidItem {
                     deviceNames = result.names
                     batteries = result.batteries
                     socketData = result.socket
+                    lastUpdate = result.last_update || ""
                 } catch(e) {
                     console.log("Parse error:", e)
                 }
@@ -70,14 +72,20 @@ PlasmoidItem {
                           plasmoid.configuration.backgroundOpacity)
             radius: 8
             
-            RowLayout {
+            ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: Kirigami.Units.largeSpacing
+                spacing: 0
+                
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
                 spacing: Kirigami.Units.largeSpacing * 2
                 
                 // Thermometers section
                 RowLayout {
                     Layout.fillWidth: true
+                    Layout.fillHeight: true
                     spacing: Kirigami.Units.largeSpacing
                     
                     Repeater {
@@ -208,15 +216,6 @@ PlasmoidItem {
                         }
                         
                         PlasmaComponents.Label {
-                            text: "Потребление: " + socketData.energy + " kWh"
-                            font.pixelSize: 12
-                            horizontalAlignment: Text.AlignHCenter
-                            Layout.fillWidth: true
-                            color: "white"
-                            opacity: 0.8
-                        }
-                        
-                        PlasmaComponents.Label {
                             text: socketData.name
                             font.pixelSize: 10
                             horizontalAlignment: Text.AlignHCenter
@@ -228,6 +227,7 @@ PlasmoidItem {
                         Item { Layout.fillHeight: true }
                     }
                 }
+            }
             }
         }
     }
