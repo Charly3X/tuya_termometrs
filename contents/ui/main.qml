@@ -64,7 +64,10 @@ PlasmoidItem {
         
         Rectangle {
             anchors.fill: parent
-            color: Kirigami.Theme.backgroundColor
+            color: Qt.rgba(Kirigami.Theme.backgroundColor.r, 
+                          Kirigami.Theme.backgroundColor.g, 
+                          Kirigami.Theme.backgroundColor.b, 
+                          plasmoid.configuration.backgroundOpacity)
             radius: 8
             
             RowLayout {
