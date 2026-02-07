@@ -4,6 +4,7 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.plasma5support as Plasma5Support
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
+import org.kde.plasma.core as PlasmaCore
 
 PlasmoidItem {
     id: root
@@ -17,10 +18,18 @@ PlasmoidItem {
     
     preferredRepresentation: fullRepresentation
     
+    Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
+    
     function getBatteryColor(level) {
-        if (level < 10) return "#ff4444"
-        if (level < 40) return "#ff9800"
-        return "#4caf50"
+        if (level < 40) return "#10b981"
+        if (level < 80) return "#10b981"
+        return "#10b981"
+    }
+    
+    function getBatteryIcon(level) {
+        if (level < 40) return "battery-050"
+        if (level < 80) return "battery-080"
+        return "battery-100"
     }
     
     Plasma5Support.DataSource {
@@ -62,104 +71,150 @@ PlasmoidItem {
     
     fullRepresentation: Item {
         Layout.preferredWidth: Kirigami.Units.gridUnit * 32
-        Layout.preferredHeight: Kirigami.Units.gridUnit * 7
+        Layout.preferredHeight: Kirigami.Units.gridUnit * 14
         
+        // Gradient background
         Rectangle {
             anchors.fill: parent
-            color: Qt.rgba(Kirigami.Theme.backgroundColor.r, 
-                          Kirigami.Theme.backgroundColor.g, 
-                          Kirigami.Theme.backgroundColor.b, 
-                          plasmoid.configuration.backgroundOpacity)
-            radius: 8
+            gradient: Gradient {
+                GradientStop { position: 0.0; color: "#f59e0b" }
+                GradientStop { position: 0.3; color: "#78716c" }
+                GradientStop { position: 0.7; color: "#ec4899" }
+                GradientStop { position: 1.0; color: "#ef4444" }
+                orientation: Gradient.Horizontal
+            }
+            radius: 24
+            opacity: plasmoid.configuration.backgroundOpacity
+        }
+        
+        // Glass panel
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: 8
+            color: Qt.rgba(0.06, 0.09, 0.16, 0.65)
+            radius: 16
+            border.width: 1
+            border.color: Qt.rgba(1, 1, 1, 0.15)
             
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: Kirigami.Units.largeSpacing
+                anchors.margins: 12
                 spacing: 0
                 
             RowLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                spacing: Kirigami.Units.largeSpacing * 2
+                spacing: 0
                 
                 // Thermometers section
                 RowLayout {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    spacing: Kirigami.Units.largeSpacing
+                    spacing: 0
                     
                     Repeater {
                         model: 3
                         
-                        Rectangle {
+                        Item {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            color: Kirigami.Theme.alternateBackgroundColor
-                            radius: 6
+                            
+                            Rectangle {
+                                anchors.fill: parent
+                                anchors.rightMargin: index < 2 ? 1 : 0
+                                color: "transparent"
+                                
+                                Rectangle {
+                                    anchors.right: parent.right
+                                    width: 1
+                                    height: parent.height
+                                    color: Qt.rgba(1, 1, 1, 0.1)
+                                    visible: index < 2
+                                }
                             
                             ColumnLayout {
                                 anchors.fill: parent
-                                anchors.margins: Kirigami.Units.smallSpacing
-                                spacing: 4
+                                anchors.margins: 8
+                                spacing: 8
                                 
                                 Item { Layout.fillHeight: true }
                                 
-                                PlasmaComponents.Label {
-                                    text: "🌡️"
-                                    font.pixelSize: 20
-                                    horizontalAlignment: Text.AlignHCenter
-                                    Layout.fillWidth: true
+                                Kirigami.Icon {
+                                    source: "temperature-normal"
+                                    Layout.preferredWidth: 22
+                                    Layout.preferredHeight: 22
+                                    Layout.alignment: Qt.AlignHCenter
+                                    color: Qt.rgba(1, 1, 1, 0.6)
                                 }
                                 
                                 PlasmaComponents.Label {
                                     text: temperatures[index] + "°"
-                                    font.pixelSize: 28
-                                    font.bold: true
+                                    font.pixelSize: 32
+                                    font.weight: Font.Bold
                                     horizontalAlignment: Text.AlignHCenter
                                     Layout.fillWidth: true
-                                    color: Kirigami.Theme.highlightColor
-                                }
-                                
-                                PlasmaComponents.Label {
-                                    text: "💧 " + humidity[index] + "%"
-                                    font.pixelSize: 14
-                                    horizontalAlignment: Text.AlignHCenter
-                                    Layout.fillWidth: true
-                                    opacity: 0.9
+                                    color: "white"
                                 }
                                 
                                 RowLayout {
-                                    Layout.fillWidth: true
+                                    Layout.alignment: Qt.AlignHCenter
                                     spacing: 4
                                     
-                                    Item { Layout.fillWidth: true }
-                                    
                                     Kirigami.Icon {
-                                        source: "battery-060"
-                                        Layout.preferredWidth: 16
-                                        Layout.preferredHeight: 16
-                                        color: root.getBatteryColor(batteries[index])
+                                        source: "raindrop"
+                                        Layout.preferredWidth: 12
+                                        Layout.preferredHeight: 12
+                                        color: "#7dd3fc"
                                     }
                                     
                                     PlasmaComponents.Label {
-                                        text: batteries[index] + "%"
+                                        text: humidity[index] + "%"
                                         font.pixelSize: 11
-                                        color: root.getBatteryColor(batteries[index])
-                                        opacity: 0.8
+                                        font.weight: Font.Medium
+                                        color: "#7dd3fc"
                                     }
+                                }
+                                
+                                Item { Layout.preferredHeight: 4 }
+                                
+                                Rectangle {
+                                    Layout.alignment: Qt.AlignHCenter
+                                    Layout.preferredHeight: 20
+                                    Layout.preferredWidth: childrenRect.width + 12
+                                    radius: 10
+                                    color: Qt.rgba(0.06, 0.73, 0.51, 0.1)
                                     
-                                    Item { Layout.fillWidth: true }
+                                    RowLayout {
+                                        anchors.centerIn: parent
+                                        spacing: 4
+                                        
+                                        Kirigami.Icon {
+                                            source: root.getBatteryIcon(batteries[index])
+                                            Layout.preferredWidth: 10
+                                            Layout.preferredHeight: 10
+                                            color: root.getBatteryColor(batteries[index])
+                                        }
+                                        
+                                        PlasmaComponents.Label {
+                                            text: batteries[index] + "%"
+                                            font.pixelSize: 10
+                                            font.weight: Font.Medium
+                                            color: root.getBatteryColor(batteries[index])
+                                        }
+                                    }
                                 }
                                 
                                 PlasmaComponents.Label {
-                                    text: deviceNames[index]
-                                    font.pixelSize: 11
+                                    text: deviceNames[index].toUpperCase()
+                                    font.pixelSize: 9
+                                    font.weight: Font.DemiBold
                                     horizontalAlignment: Text.AlignHCenter
                                     Layout.fillWidth: true
-                                    opacity: 0.6
+                                    color: Qt.rgba(1, 1, 1, 0.4)
                                 }
                                 
                                 Item { Layout.fillHeight: true }
+                            }
                             }
                         }
                     }
@@ -167,31 +222,49 @@ PlasmoidItem {
                 
                 // Socket section
                 Rectangle {
-                    Layout.preferredWidth: Kirigami.Units.gridUnit * 9
+                    Layout.preferredWidth: 140
                     Layout.fillHeight: true
-                    color: Kirigami.Theme.highlightColor
-                    radius: 6
-                    opacity: 0.9
+                    Layout.margins: 6
+                    color: "#38bdf8"
+                    radius: 14
+                    
+                    Rectangle {
+                        anchors.fill: parent
+                        gradient: Gradient {
+                            GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.1) }
+                            GradientStop { position: 1.0; color: "transparent" }
+                        }
+                        radius: parent.radius
+                    }
                     
                     ColumnLayout {
                         anchors.fill: parent
-                        anchors.margins: Kirigami.Units.smallSpacing
-                        spacing: 4
+                        anchors.margins: 8
+                        spacing: 8
                         
                         Item { Layout.fillHeight: true }
                         
-                        PlasmaComponents.Label {
-                            text: "⚡"
-                            font.pixelSize: 24
-                            horizontalAlignment: Text.AlignHCenter
-                            Layout.fillWidth: true
-                            color: "white"
+                        Rectangle {
+                            Layout.preferredWidth: 40
+                            Layout.preferredHeight: 40
+                            Layout.alignment: Qt.AlignHCenter
+                            radius: 20
+                            color: Qt.rgba(1, 1, 1, 0.2)
+                            border.width: 1
+                            border.color: Qt.rgba(1, 1, 1, 0.1)
+                            
+                            PlasmaComponents.Label {
+                                anchors.centerIn: parent
+                                text: "⚡"
+                                font.pixelSize: 24
+                                color: "white"
+                            }
                         }
                         
                         PlasmaComponents.Label {
                             text: socketData.power + "W"
-                            font.pixelSize: 32
-                            font.bold: true
+                            font.pixelSize: 36
+                            font.weight: Font.Bold
                             horizontalAlignment: Text.AlignHCenter
                             Layout.fillWidth: true
                             color: "white"
@@ -200,28 +273,20 @@ PlasmoidItem {
                         PlasmaComponents.Label {
                             text: socketData.voltage + "V"
                             font.pixelSize: 14
+                            font.weight: Font.Medium
                             horizontalAlignment: Text.AlignHCenter
                             Layout.fillWidth: true
-                            color: "white"
-                            opacity: 0.9
-                        }
-                        
-                        Rectangle {
-                            Layout.preferredHeight: 1
-                            Layout.fillWidth: true
-                            Layout.leftMargin: Kirigami.Units.largeSpacing
-                            Layout.rightMargin: Kirigami.Units.largeSpacing
-                            color: "white"
-                            opacity: 0.3
+                            color: "#bfdbfe"
+                            opacity: 0.8
                         }
                         
                         PlasmaComponents.Label {
                             text: socketData.name
-                            font.pixelSize: 10
+                            font.pixelSize: 11
+                            font.weight: Font.Medium
                             horizontalAlignment: Text.AlignHCenter
                             Layout.fillWidth: true
-                            color: "white"
-                            opacity: 0.6
+                            color: Qt.rgba(1, 1, 1, 0.7)
                         }
                         
                         Item { Layout.fillHeight: true }
