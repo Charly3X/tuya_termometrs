@@ -70,8 +70,8 @@ PlasmoidItem {
     }
     
     fullRepresentation: Item {
-        Layout.preferredWidth: Kirigami.Units.gridUnit * 32
-        Layout.preferredHeight: Kirigami.Units.gridUnit * 14
+        Layout.preferredWidth: Kirigami.Units.gridUnit * 28
+        Layout.preferredHeight: Kirigami.Units.gridUnit * 12
         
         // Gradient background
         Rectangle {
@@ -98,7 +98,7 @@ PlasmoidItem {
             
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: 12
+                anchors.margins: 8
                 spacing: 0
                 
             RowLayout {
@@ -134,8 +134,8 @@ PlasmoidItem {
                             
                             ColumnLayout {
                                 anchors.fill: parent
-                                anchors.margins: 8
-                                spacing: 8
+                                anchors.margins: 6
+                                spacing: 6
                                 
                                 Item { Layout.fillHeight: true }
                                 
@@ -222,9 +222,9 @@ PlasmoidItem {
                 
                 // Socket section
                 Rectangle {
-                    Layout.preferredWidth: 140
+                    Layout.preferredWidth: 120
                     Layout.fillHeight: true
-                    Layout.margins: 6
+                    Layout.margins: 4
                     color: "#38bdf8"
                     radius: 14
                     
@@ -239,8 +239,8 @@ PlasmoidItem {
                     
                     ColumnLayout {
                         anchors.fill: parent
-                        anchors.margins: 8
-                        spacing: 8
+                        anchors.margins: 6
+                        spacing: 6
                         
                         Item { Layout.fillHeight: true }
                         
