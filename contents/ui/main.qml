@@ -60,9 +60,9 @@ PlasmoidItem {
         executable.connectSource(cmd)
     }
     
-    // Update all data every 30 seconds
+    // Update all data every 2 minutes
     Timer {
-        interval: 30000
+        interval: 120000
         running: true
         repeat: true
         triggeredOnStart: true

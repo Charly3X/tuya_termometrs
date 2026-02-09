@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Final Smart Home Widget V3</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#38bdf8",
+              "glass-border": "rgba(255, 255, 255, 0.15)",
+              "glass-bg": "rgba(0, 0, 0, 0.65)",
+            },
+            fontFamily: {
+              sans: ["Inter", "sans-serif"],
+            },
+            borderRadius: {
+              '3xl': '1.75rem', 
+              '4xl': '2.25rem',
+            },
+          },
+        },
+      };
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .icon-fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-gray-100 dark:bg-gray-900 min-h-screen flex items-center justify-center p-6">
+<div class="relative w-full max-w-[460px] aspect-[2/1] rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10">
+<div class="absolute inset-0 z-0">
+<img alt="Abstract colorful gradient background" class="w-full h-full object-cover opacity-80" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBm7Cj689e0NRSjQGrl2WlKoq-MY980LGsLBLuGQe4o92WQWUB_wl3VdndEXDEblOMa-7wtf9JoWf5Hrt2H92ueeFaVx_qWv7bCAGKG-YBq6v4z8uA_qhGrrg-h6w1d1g5ZRKflzpft2TMa4bLr7jpI4hep9bSc5AMbzO-eJ_Snwfq29y0wpF_lw49qXObvL0eV2FkE8XTPL8gi90OFYYOfkMy0lTTFAmschf00ki99E4XJ7wjgloq9EG_6j-HGS-ph9kaWSnf2p-Ru"/>
+</div>
+<div class="absolute inset-0 z-10 p-2 flex">
+<div class="glass-panel w-full h-full rounded-2xl flex relative overflow-hidden">
+<div class="flex-1 flex flex-col py-3 px-1">
+<div class="flex-1 grid grid-cols-3 divide-x divide-white/10">
+<div class="flex flex-col items-center justify-between px-1 py-1">
+<span class="material-symbols-outlined text-white/60 text-[22px]">thermostat</span>
+<div class="flex flex-col items-center gap-0.5">
+<span class="text-white text-lg font-bold tracking-tight">23.3°</span>
+<div class="flex items-center gap-1 text-sky-300 text-[11px] font-medium">
+<span class="material-symbols-outlined text-[12px] icon-fill">humidity_percentage</span>
+<span>53%</span>
+</div>
+</div>
+<div class="flex flex-col items-center gap-1.5 w-full">
+<div class="flex items-center gap-1 text-emerald-400 text-[10px] font-medium bg-emerald-400/10 px-1.5 py-0.5 rounded-full">
+<span class="material-symbols-outlined text-[10px] icon-fill">battery_horiz_050</span>
+<span>40%</span>
+</div>
+<span class="text-white/40 text-[9px] uppercase tracking-wider font-semibold">Bedroom</span>
+</div>
+</div>
+<div class="flex flex-col items-center justify-between px-1 py-1">
+<span class="material-symbols-outlined text-white/60 text-[22px]">thermostat</span>
+<div class="flex flex-col items-center gap-0.5">
+<span class="text-white text-lg font-bold tracking-tight">23.5°</span>
+<div class="flex items-center gap-1 text-sky-300 text-[11px] font-medium">
+<span class="material-symbols-outlined text-[12px] icon-fill">humidity_percentage</span>
+<span>59%</span>
+</div>
+</div>
+<div class="flex flex-col items-center gap-1.5 w-full">
+<div class="flex items-center gap-1 text-emerald-400 text-[10px] font-medium bg-emerald-400/10 px-1.5 py-0.5 rounded-full">
+<span class="material-symbols-outlined text-[10px] icon-fill">battery_full_alt</span>
+<span>80%</span>
+</div>
+<span class="text-white/40 text-[9px] uppercase tracking-wider font-semibold">Living</span>
+</div>
+</div>
+<div class="flex flex-col items-center justify-between px-1 py-1">
+<span class="material-symbols-outlined text-white/60 text-[22px]">thermostat</span>
+<div class="flex flex-col items-center gap-0.5">
+<span class="text-white text-lg font-bold tracking-tight">24.7°</span>
+<div class="flex items-center gap-1 text-sky-300 text-[11px] font-medium">
+<span class="material-symbols-outlined text-[12px] icon-fill">humidity_percentage</span>
+<span>51%</span>
+</div>
+</div>
+<div class="flex flex-col items-center gap-1.5 w-full">
+<div class="flex items-center gap-1 text-emerald-400 text-[10px] font-medium bg-emerald-400/10 px-1.5 py-0.5 rounded-full">
+<span class="material-symbols-outlined text-[10px] icon-fill">battery_horiz_050</span>
+<span>40%</span>
+</div>
+<span class="text-white/40 text-[9px] uppercase tracking-wider font-semibold">Nursery</span>
+</div>
+</div>
+</div>
+</div>
+<div class="w-[140px] m-1.5 bg-sky-500 rounded-[14px] flex flex-col items-center justify-between py-5 px-2 shadow-lg relative overflow-hidden group">
+<div class="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent pointer-events-none"></div>
+<div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm shadow-sm ring-1 ring-white/10 mt-1">
+<span class="material-symbols-outlined text-white text-[24px] icon-fill">bolt</span>
+</div>
+<div class="flex flex-col items-center gap-0.5 text-center w-full z-10">
+<span class="text-white text-[28px] font-bold tracking-tight leading-none">37.8W</span>
+<span class="text-sky-100 text-sm font-medium opacity-80 leading-tight">239V</span>
+</div>
+<span class="text-white/70 text-[11px] font-medium tracking-wide mb-0.5">Smart Plug</span>
+</div>
+</div>
+</div>
+</div>
+
+</body></html>
