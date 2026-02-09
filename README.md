@@ -9,9 +9,10 @@ A modern desktop widget for KDE Plasma 6 that displays real-time data from Tuya 
 - 🌡️ **Temperature & Humidity Monitoring** - Display data from up to 3 Tuya thermometer/hygrometer sensors
 - 🔋 **Battery Status** - Color-coded battery indicators (green/orange/red) for battery-powered devices
 - ⚡ **Smart Plug Monitoring** - Real-time power consumption, voltage, and daily energy usage
-- 🎨 **Modern Card Design** - Clean, rounded card interface that matches KDE Plasma 6 theme
+- 🎨 **Modern Card Design** - Clean, rounded card interface with gradient background and glass effect
 - 🔄 **Auto-refresh** - Updates every 30 seconds
 - 🌍 **Multi-region Support** - Works with Tuya Cloud regions (EU, US, CN, IN, etc.)
+- ⚡ **Optimized API Calls** - Batch requests and device name caching for faster updates
 
 ## Requirements
 
@@ -74,11 +75,11 @@ Edit `config.json`:
     "region": "eu",
     "client_id": "YOUR_CLIENT_ID",
     "client_secret": "YOUR_CLIENT_SECRET",
-    "device_id": "ANY_DEVICE_ID",
+    "device_id": "YOUR_DEVICE_ID",
     "devices": [
-        "THERMOMETER_1_ID",
-        "THERMOMETER_2_ID",
-        "THERMOMETER_3_ID"
+        "DEVICE_ID_1",
+        "DEVICE_ID_2",
+        "DEVICE_ID_3"
     ],
     "socket": "SMART_PLUG_ID"
 }
@@ -88,9 +89,14 @@ Edit `config.json`:
 - `region` - Tuya Cloud region: `eu`, `us`, `cn`, `in`, `ue`
 - `client_id` - Your Tuya Client ID
 - `client_secret` - Your Tuya Client Secret
-- `device_id` - Any device ID (required for API initialization)
+- `device_id` - Any valid device ID from your account (required for API initialization)
 - `devices` - Array of 3 thermometer device IDs
-- `socket` - Smart plug device ID (optional)
+- `socket` - Smart plug device ID (optional, omit if not using)
+
+**Performance Features:**
+- Device names are cached for 24 hours to reduce API calls
+- Batch API requests fetch all device statuses in a single call
+- Fallback to shadow properties API for battery-powered devices
 
 ## Widget Display
 
@@ -111,7 +117,9 @@ Shows:
 ## Troubleshooting
 
 ### No data from battery-powered sensors
-Battery-powered Tuya sensors send data periodically (every 30-60 minutes) to save power. The widget uses Tuya's shadow properties API to fetch the last known values.
+Battery-powered Tuya sensors send data periodically (every 30-60 minutes) to save power. The widget uses:
+1. Batch status API for real-time data (when available)
+2. Shadow properties API as fallback for last known values
 
 ### "No devices found"
 1. Ensure you've linked your SmartLife app account in Tuya IoT Platform
@@ -128,6 +136,12 @@ systemctl --user restart tuya-update.timer
 
 # Check logs
 journalctl --user -u tuya-update.service
+```
+
+### Device names not showing
+Device names are cached for 24 hours. To force refresh:
+```bash
+rm ~/projects/tuya/device_names_cache.json
 ```
 
 ## Development
