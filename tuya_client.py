@@ -7,12 +7,31 @@ import tinytuya
 
 CONFIG_FILE = Path(__file__).parent / "config.json"
 OUTPUT_FILE = Path(__file__).parent / "data.json"
+CACHE_FILE = Path(__file__).parent / "device_names_cache.json"
 
 def load_config():
     if not CONFIG_FILE.exists():
         return None
     with open(CONFIG_FILE) as f:
         return json.load(f)
+
+def load_device_names_cache():
+    if not CACHE_FILE.exists():
+        return None
+    try:
+        with open(CACHE_FILE) as f:
+            cache = json.load(f)
+            # Check if cache is older than 24 hours
+            cache_time = datetime.fromisoformat(cache.get("timestamp", "2000-01-01T00:00:00"))
+            if (datetime.now() - cache_time).total_seconds() > 86400:
+                return None
+            return cache.get("names", {})
+    except:
+        return None
+
+def save_device_names_cache(names):
+    with open(CACHE_FILE, 'w') as f:
+        json.dump({"timestamp": datetime.now().isoformat(), "names": names}, f)
 
 def get_temperatures():
     config = load_config()
@@ -26,9 +45,12 @@ def get_temperatures():
         apiDeviceID=config["device_id"]
     )
     
-    # Get all devices once to get names
-    all_devices = cloud.getdevices()
-    device_map = {d["id"]: d["name"] for d in all_devices}
+    # Load or fetch device names
+    device_map = load_device_names_cache()
+    if device_map is None:
+        all_devices = cloud.getdevices()
+        device_map = {d["id"]: d["name"] for d in all_devices}
+        save_device_names_cache(device_map)
     
     devices = config["devices"]
     temps = []
@@ -36,27 +58,43 @@ def get_temperatures():
     names = []
     batteries = []
     
+    # Get shadow properties for all thermometers in one batch request
+    all_device_ids = devices.copy()
+    if "socket" in config:
+        all_device_ids.append(config["socket"])
+    
+    device_ids_str = ",".join(all_device_ids)
+    batch_response = cloud.cloudrequest(
+        f'/v1.0/iot-03/devices/status?device_ids={device_ids_str}',
+        action='GET'
+    )
+    
+    # Create a map of device_id -> status for quick lookup
+    status_map = {}
+    if batch_response.get("success") and batch_response.get("result"):
+        for device_data in batch_response["result"]:
+            status_map[device_data["id"]] = device_data.get("status", [])
+    
+    # Process thermometers
     for device_id in devices:
         try:
             device_name = device_map.get(device_id, device_id[:8])
-            
-            # Get status
-            status = cloud.getstatus(device_id)
             temp = None
             humid = None
             battery = None
             
-            if status.get("result"):
-                for item in status.get("result", []):
-                    if item["code"] in ["va_temperature", "temp_current", "temperature"]:
-                        temp = item["value"] / 10 if item["value"] > 100 else item["value"]
-                    elif item["code"] in ["va_humidity", "humidity_value", "humidity"]:
-                        humid = item["value"]
-                    elif item["code"] in ["battery_state", "battery_percentage"]:
-                        battery = item["value"]
+            # Try to get from batch response first
+            status_list = status_map.get(device_id, [])
+            for item in status_list:
+                if item["code"] in ["temp_current", "temperature", "va_temperature"]:
+                    temp = item["value"] / 10 if item["value"] > 100 else item["value"]
+                elif item["code"] in ["humidity_value", "humidity", "va_humidity"]:
+                    humid = item["value"]
+                elif item["code"] in ["battery_state", "battery_percentage"]:
+                    battery = item["value"]
             
-            # If no data, try shadow properties (for battery devices)
-            if temp is None or battery is None:
+            # If no data from batch, try shadow API as fallback
+            if temp is None:
                 try:
                     shadow = cloud.cloudrequest(
                         f'/v2.0/cloud/thing/{device_id}/shadow/properties',
@@ -84,7 +122,7 @@ def get_temperatures():
             elif isinstance(battery, (int, float)):
                 batteries.append(int(battery))
             else:
-                batteries.append(100)  # No battery info = assume powered
+                batteries.append(100)
                 
         except Exception as e:
             temps.append("ERR")
@@ -99,15 +137,15 @@ def get_temperatures():
             socket_id = config["socket"]
             socket_data["name"] = device_map.get(socket_id, "Socket")
             
-            status = cloud.getstatus(socket_id)
-            if status.get("result"):
-                for item in status.get("result", []):
-                    if item["code"] == "cur_power":
-                        socket_data["power"] = f"{item['value'] / 10:.1f}"
-                    elif item["code"] == "cur_voltage":
-                        socket_data["voltage"] = f"{item['value'] / 10:.0f}"
-                    elif item["code"] == "add_ele":
-                        socket_data["energy"] = f"{item['value'] / 1000:.2f}"
+            # Use data from batch response
+            status_list = status_map.get(socket_id, [])
+            for item in status_list:
+                if item["code"] == "cur_power":
+                    socket_data["power"] = f"{item['value'] / 10:.1f}"
+                elif item["code"] == "cur_voltage":
+                    socket_data["voltage"] = f"{item['value'] / 10:.0f}"
+                elif item["code"] == "add_ele":
+                    socket_data["energy"] = f"{item['value'] / 1000:.2f}"
         except Exception as e:
             pass
     

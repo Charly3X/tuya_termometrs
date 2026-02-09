@@ -21,8 +21,8 @@ PlasmoidItem {
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
     
     function getBatteryColor(level) {
-        if (level < 40) return "#10b981"
-        if (level < 80) return "#10b981"
+        if (level < 20) return "#ef4444"
+        if (level < 40) return "#f97316"
         return "#10b981"
     }
     
@@ -222,7 +222,7 @@ PlasmoidItem {
                 
                 // Socket section
                 Rectangle {
-                    Layout.preferredWidth: 120
+                    Layout.preferredWidth: 130
                     Layout.fillHeight: true
                     Layout.margins: 4
                     color: "#38bdf8"
