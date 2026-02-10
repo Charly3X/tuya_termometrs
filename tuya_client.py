@@ -8,6 +8,11 @@ import tinytuya
 CONFIG_FILE = Path(__file__).parent / "config.json"
 OUTPUT_FILE = Path(__file__).parent / "data.json"
 CACHE_FILE = Path(__file__).parent / "device_names_cache.json"
+LOG_FILE = Path(__file__).parent / "api_calls.log"
+
+def log_api_call(message):
+    with open(LOG_FILE, 'a') as f:
+        f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}\n")
 
 def load_config():
     if not CONFIG_FILE.exists():
@@ -34,6 +39,7 @@ def save_device_names_cache(names):
         json.dump({"timestamp": datetime.now().isoformat(), "names": names}, f)
 
 def get_temperatures():
+    log_api_call("=== Widget update started ===")
     config = load_config()
     if not config:
         return {"temperatures": ["-", "-", "-"], "humidity": ["-", "-", "-"], "names": ["No config", "", ""], "batteries": [0, 0, 0], "socket": {}}
@@ -48,9 +54,12 @@ def get_temperatures():
     # Load or fetch device names
     device_map = load_device_names_cache()
     if device_map is None:
+        log_api_call("API CALL: cloud.getdevices() - fetching device names")
         all_devices = cloud.getdevices()
         device_map = {d["id"]: d["name"] for d in all_devices}
         save_device_names_cache(device_map)
+    else:
+        log_api_call("Using cached device names")
     
     devices = config["devices"]
     temps = []
@@ -58,12 +67,13 @@ def get_temperatures():
     names = []
     batteries = []
     
-    # Get shadow properties for all thermometers in one batch request
+    # Get status for all devices in one batch request
     all_device_ids = devices.copy()
     if "socket" in config:
         all_device_ids.append(config["socket"])
     
     device_ids_str = ",".join(all_device_ids)
+    log_api_call(f"API CALL: batch status request for {len(all_device_ids)} devices")
     batch_response = cloud.cloudrequest(
         f'/v1.0/iot-03/devices/status?device_ids={device_ids_str}',
         action='GET'
@@ -95,21 +105,19 @@ def get_temperatures():
             
             # If no data from batch, try shadow API as fallback
             if temp is None:
-                try:
-                    shadow = cloud.cloudrequest(
-                        f'/v2.0/cloud/thing/{device_id}/shadow/properties',
-                        action='GET'
-                    )
-                    if shadow.get("success") and shadow.get("result", {}).get("properties"):
-                        for prop in shadow["result"]["properties"]:
-                            if prop["code"] in ["temp_current", "temperature"] and temp is None:
-                                temp = prop["value"] / 10 if prop["value"] > 100 else prop["value"]
-                            elif prop["code"] in ["humidity_value", "humidity"] and humid is None:
-                                humid = prop["value"]
-                            elif prop["code"] in ["battery_state", "battery_percentage"] and battery is None:
-                                battery = prop["value"]
-                except:
-                    pass
+                log_api_call(f"API CALL: shadow properties for device {device_id[:8]} (fallback)")
+                shadow = cloud.cloudrequest(
+                    f'/v2.0/cloud/thing/{device_id}/shadow/properties',
+                    action='GET'
+                )
+                if shadow.get("success") and shadow.get("result", {}).get("properties"):
+                    for prop in shadow["result"]["properties"]:
+                        if prop["code"] in ["temp_current", "temperature"]:
+                            temp = prop["value"] / 10 if prop["value"] > 100 else prop["value"]
+                        elif prop["code"] in ["humidity_value", "humidity"]:
+                            humid = prop["value"]
+                        elif prop["code"] in ["battery_state", "battery_percentage"]:
+                            battery = prop["value"]
             
             temps.append(f"{temp:.1f}" if temp is not None else "--")
             humids.append(f"{humid}" if humid is not None else "--")
@@ -130,7 +138,7 @@ def get_temperatures():
             names.append("Error")
             batteries.append(0)
     
-    # Get socket data
+    # Get socket data from batch response
     socket_data = {"name": "", "power": "--", "voltage": "--", "energy": "--"}
     if "socket" in config:
         try:
@@ -153,6 +161,7 @@ def get_temperatures():
 
 if __name__ == "__main__":
     result = get_temperatures()
+    log_api_call(f"=== Widget update finished ===\n")
     
     # Write to file for widget to read
     with open(OUTPUT_FILE, 'w') as f:
