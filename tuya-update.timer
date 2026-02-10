@@ -1,9 +1,0 @@
-[Unit]
-Description=Update Tuya thermometer data every minute
-
-[Timer]
-OnBootSec=10s
-OnUnitActiveSec=120s
-
-[Install]
-WantedBy=timers.target

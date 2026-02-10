@@ -16,16 +16,6 @@ cp -r contents ~/.local/share/plasma/plasmoids/org.kde.plasma.tuya/
 # Update script path in config
 sed -i "s|/home/charoyan/projects/tuya|$SCRIPT_DIR|g" ~/.local/share/plasma/plasmoids/org.kde.plasma.tuya/contents/config/main.xml
 
-# Install systemd timer
-mkdir -p ~/.config/systemd/user
-cp tuya-update.service ~/.config/systemd/user/
-cp tuya-update.timer ~/.config/systemd/user/
-
-# Enable and start timer
-systemctl --user daemon-reload
-systemctl --user enable tuya-update.timer
-systemctl --user start tuya-update.timer
-
 # Run once to create initial data
 "$SCRIPT_DIR/venv/bin/python3" "$SCRIPT_DIR/tuya_client.py"
 

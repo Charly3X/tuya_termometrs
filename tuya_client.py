@@ -8,17 +8,55 @@ import tinytuya
 CONFIG_FILE = Path(__file__).parent / "config.json"
 OUTPUT_FILE = Path(__file__).parent / "data.json"
 CACHE_FILE = Path(__file__).parent / "device_names_cache.json"
+TOKEN_CACHE_FILE = Path(__file__).parent / "token_cache.json"
 LOG_FILE = Path(__file__).parent / "api_calls.log"
 
 def log_api_call(message):
     with open(LOG_FILE, 'a') as f:
         f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}\n")
 
+def trim_log_file():
+    if not LOG_FILE.exists():
+        return
+    
+    with open(LOG_FILE, 'r') as f:
+        lines = f.readlines()
+    
+    # Find last 3 "Widget update started" occurrences
+    starts = [i for i, line in enumerate(lines) if "Widget update started" in line]
+    
+    if len(starts) > 3:
+        # Keep only last 3 cycles
+        keep_from = starts[-3]
+        with open(LOG_FILE, 'w') as f:
+            f.writelines(lines[keep_from:])
+
 def load_config():
     if not CONFIG_FILE.exists():
         return None
     with open(CONFIG_FILE) as f:
         return json.load(f)
+
+def load_token_cache():
+    if not TOKEN_CACHE_FILE.exists():
+        return None
+    try:
+        with open(TOKEN_CACHE_FILE) as f:
+            cache = json.load(f)
+            expire_time = datetime.fromisoformat(cache.get("expire_time", "2000-01-01T00:00:00"))
+            if datetime.now() < expire_time:
+                return cache.get("token")
+    except:
+        pass
+    return None
+
+def save_token_cache(token):
+    expire_time = datetime.now().timestamp() + 5400  # 1.5 hours
+    with open(TOKEN_CACHE_FILE, 'w') as f:
+        json.dump({
+            "token": token,
+            "expire_time": datetime.fromtimestamp(expire_time).isoformat()
+        }, f)
 
 def load_device_names_cache():
     if not CACHE_FILE.exists():
@@ -44,12 +82,24 @@ def get_temperatures():
     if not config:
         return {"temperatures": ["-", "-", "-"], "humidity": ["-", "-", "-"], "names": ["No config", "", ""], "batteries": [0, 0, 0], "socket": {}}
     
+    # Try to load cached token
+    cached_token = load_token_cache()
+    if cached_token:
+        log_api_call("Using cached token")
+    else:
+        log_api_call("Getting new token")
+    
     cloud = tinytuya.Cloud(
         apiRegion=config["region"],
         apiKey=config["client_id"],
         apiSecret=config["client_secret"],
-        apiDeviceID=config["device_id"]
+        apiDeviceID=config["device_id"],
+        initial_token=cached_token
     )
+    
+    # Save token if it's new
+    if not cached_token:
+        save_token_cache(cloud.token)
     
     # Load or fetch device names
     device_map = load_device_names_cache()
@@ -78,6 +128,7 @@ def get_temperatures():
         f'/v1.0/iot-03/devices/status?device_ids={device_ids_str}',
         action='GET'
     )
+    log_api_call(f"RESPONSE: {json.dumps(batch_response)}")
     
     # Create a map of device_id -> status for quick lookup
     status_map = {}
@@ -110,11 +161,12 @@ def get_temperatures():
                     f'/v2.0/cloud/thing/{device_id}/shadow/properties',
                     action='GET'
                 )
+                log_api_call(f"RESPONSE: {json.dumps(shadow)}")
                 if shadow.get("success") and shadow.get("result", {}).get("properties"):
                     for prop in shadow["result"]["properties"]:
-                        if prop["code"] in ["temp_current", "temperature"]:
+                        if prop["code"] in ["temp_current", "temperature", "va_temperature"]:
                             temp = prop["value"] / 10 if prop["value"] > 100 else prop["value"]
-                        elif prop["code"] in ["humidity_value", "humidity"]:
+                        elif prop["code"] in ["humidity_value", "humidity", "va_humidity"]:
                             humid = prop["value"]
                         elif prop["code"] in ["battery_state", "battery_percentage"]:
                             battery = prop["value"]
@@ -162,6 +214,9 @@ def get_temperatures():
 if __name__ == "__main__":
     result = get_temperatures()
     log_api_call(f"=== Widget update finished ===\n")
+    
+    # Trim log to keep only last 3 cycles
+    trim_log_file()
     
     # Write to file for widget to read
     with open(OUTPUT_FILE, 'w') as f:
