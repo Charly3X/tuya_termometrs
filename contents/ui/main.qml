@@ -14,7 +14,8 @@ PlasmoidItem {
     property var deviceNames: ["Loading...", "Loading...", "Loading..."]
     property var batteries: [0, 0, 0]
     property var socketData: {"name": "", "power": "--", "voltage": "--", "energy": "--"}
-    property string lastUpdate: ""
+    property string thermometerUpdate: ""
+    property string socketUpdate: ""
     
     preferredRepresentation: fullRepresentation
     
@@ -41,12 +42,23 @@ PlasmoidItem {
             if (data["exit code"] === 0) {
                 try {
                     var result = JSON.parse(data.stdout)
-                    temperatures = result.temperatures
-                    humidity = result.humidity
-                    deviceNames = result.names
-                    batteries = result.batteries
-                    socketData = result.socket
-                    lastUpdate = result.last_update || ""
+                    var now = Qt.formatTime(new Date(), "HH:mm:ss")
+                    if (result.temperatures) {
+                        temperatures = result.temperatures
+                        humidity = result.humidity
+                        deviceNames = result.names
+                        batteries = result.batteries
+                        thermometerUpdate = now
+                    }
+                    if (result.socket) {
+                        socketData = {
+                            "name": result.socket.name,
+                            "power": result.socket.power,
+                            "voltage": result.socket.voltage,
+                            "energy": result.socket.energy
+                        }
+                        socketUpdate = now
+                    }
                 } catch(e) {
                     console.log("Parse error:", e)
                 }
@@ -55,18 +67,32 @@ PlasmoidItem {
         }
     }
     
-    function updateData() {
-        var cmd = "/home/charoyan/projects/tuya/venv/bin/python3 /home/charoyan/projects/tuya/tuya_client.py"
+    function updateThermometers() {
+        var cmd = "/home/charoyan/projects/tuya/venv/bin/python3 /home/charoyan/projects/tuya/tuya_client.py thermometers"
         executable.connectSource(cmd)
     }
     
-    // Update all data every 2 minutes
+    function updateSocket() {
+        var cmd = "/home/charoyan/projects/tuya/venv/bin/python3 /home/charoyan/projects/tuya/tuya_client.py socket"
+        executable.connectSource(cmd)
+    }
+    
     Timer {
-        interval: 120000
+        id: thermometerTimer
+        interval: plasmoid.configuration.thermometerUpdateInterval * 1000
         running: true
         repeat: true
         triggeredOnStart: true
-        onTriggered: updateData()
+        onTriggered: updateThermometers()
+    }
+    
+    Timer {
+        id: socketTimer
+        interval: plasmoid.configuration.socketUpdateInterval * 1000
+        running: true
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: updateSocket()
     }
     
     fullRepresentation: Item {
@@ -107,6 +133,11 @@ PlasmoidItem {
                 spacing: 0
                 
                 // Thermometers section
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    spacing: 0
+                    
                 RowLayout {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
@@ -213,11 +244,21 @@ PlasmoidItem {
                                     color: Qt.rgba(1, 1, 1, 0.4)
                                 }
                                 
+                                PlasmaComponents.Label {
+                                    text: index === 1 && thermometerUpdate ? "↻ " + thermometerUpdate : ""
+                                    font.pixelSize: 8
+                                    horizontalAlignment: Text.AlignHCenter
+                                    Layout.fillWidth: true
+                                    color: Qt.rgba(1, 1, 1, 0.6)
+                                    visible: index === 1
+                                }
+                                
                                 Item { Layout.fillHeight: true }
                             }
                             }
                         }
                     }
+                }
                 }
                 
                 // Socket section
@@ -240,7 +281,7 @@ PlasmoidItem {
                     ColumnLayout {
                         anchors.fill: parent
                         anchors.margins: 6
-                        spacing: 6
+                        spacing: 3
                         
                         Item { Layout.fillHeight: true }
                         
@@ -287,6 +328,14 @@ PlasmoidItem {
                             horizontalAlignment: Text.AlignHCenter
                             Layout.fillWidth: true
                             color: Qt.rgba(1, 1, 1, 0.7)
+                        }
+                        
+                        PlasmaComponents.Label {
+                            text: socketUpdate ? "↻ " + socketUpdate : ""
+                            font.pixelSize: 8
+                            horizontalAlignment: Text.AlignHCenter
+                            Layout.fillWidth: true
+                            color: Qt.rgba(1, 1, 1, 0.6)
                         }
                         
                         Item { Layout.fillHeight: true }

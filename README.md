@@ -10,7 +10,8 @@ A modern desktop widget for KDE Plasma 6 that displays real-time data from Tuya 
 - 🔋 **Battery Status** - Color-coded battery indicators (green/orange/red) for battery-powered devices
 - ⚡ **Smart Plug Monitoring** - Real-time power consumption, voltage, and daily energy usage
 - 🎨 **Modern Card Design** - Clean, rounded card interface with gradient background and glass effect
-- 🔄 **Auto-refresh** - Updates every 30 seconds
+- 🔄 **Configurable Update Intervals** - Separate refresh rates for thermometers and smart plug
+- 🕐 **Last Update Timestamps** - Shows when each device type was last updated
 - 🌍 **Multi-region Support** - Works with Tuya Cloud regions (EU, US, CN, IN, etc.)
 - ⚡ **Optimized API Calls** - Batch requests and device name caching for faster updates
 
@@ -95,8 +96,19 @@ Edit `config.json`:
 
 **Performance Features:**
 - Device names are cached for 24 hours to reduce API calls
+- Separate update intervals for thermometers and smart plug
 - Batch API requests fetch all device statuses in a single call
 - Fallback to shadow properties API for battery-powered devices
+
+## Widget Configuration
+
+Right-click on widget → **Configure** to adjust:
+
+- **Thermometer Update Interval** - How often to refresh thermometer data (30-600 seconds, default: 120s)
+- **Socket Update Interval** - How often to refresh smart plug data (10-300 seconds, default: 30s)
+- **Background Opacity** - Adjust widget transparency (0.0-1.0)
+
+Each section displays its last update time at the bottom.
 
 ## Widget Display
 
@@ -106,6 +118,7 @@ Each card shows:
 - 💧 Humidity percentage
 - 🔋 Battery level (color-coded)
 - Device name
+- Last update time (displayed under middle thermometer)
 
 ### Smart Plug Card
 Shows:
@@ -113,6 +126,7 @@ Shows:
 - Voltage (V)
 - Daily energy usage (kWh)
 - Device name
+- Last update time
 
 ## Troubleshooting
 
@@ -127,16 +141,7 @@ Battery-powered Tuya sensors send data periodically (every 30-60 minutes) to sav
 3. Verify API subscriptions are active
 
 ### Widget not updating
-```bash
-# Check systemd timer status
-systemctl --user status tuya-update.timer
-
-# Restart timer
-systemctl --user restart tuya-update.timer
-
-# Check logs
-journalctl --user -u tuya-update.service
-```
+Check widget configuration settings (right-click → Configure) and adjust update intervals if needed. The widget uses internal QML timers - no systemd services required.
 
 ### Device names not showing
 Device names are cached for 24 hours. To force refresh:
@@ -163,8 +168,14 @@ tuya_termometrs/
 
 ### Manual Testing
 ```bash
-# Test data fetching
+# Test data fetching (all devices)
 ./venv/bin/python3 tuya_client.py
+
+# Test thermometers only
+./venv/bin/python3 tuya_client.py thermometers
+
+# Test socket only
+./venv/bin/python3 tuya_client.py socket
 
 # List all devices
 ./venv/bin/python3 list_devices.py
@@ -176,13 +187,8 @@ tuya_termometrs/
 ## Uninstall
 
 ```bash
-# Stop and disable timer
-systemctl --user stop tuya-update.timer
-systemctl --user disable tuya-update.timer
-
 # Remove widget
 rm -rf ~/.local/share/plasma/plasmoids/org.kde.plasma.tuya
-rm ~/.config/systemd/user/tuya-update.*
 
 # Restart Plasma
 killall plasmashell && kstart plasmashell &

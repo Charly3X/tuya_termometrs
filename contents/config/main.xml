@@ -11,5 +11,11 @@
         <entry name="backgroundOpacity" type="Double">
             <default>1.0</default>
         </entry>
+        <entry name="thermometerUpdateInterval" type="Int">
+            <default>120</default>
+        </entry>
+        <entry name="socketUpdateInterval" type="Int">
+            <default>30</default>
+        </entry>
     </group>
 </kcfg>

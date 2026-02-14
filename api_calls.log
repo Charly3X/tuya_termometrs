@@ -1,0 +1,485 @@
+[2026-02-14 19:50:01] === Widget update started ===
+[2026-02-14 19:50:01] Using cached token
+[2026-02-14 19:50:01] Using cached device names
+[2026-02-14 19:50:01] API CALL: batch status request for 4 devices
+[2026-02-14 19:50:01] RESPONSE: {"result": [{"id": "bfac5ed45637af7f13fzwd", "status": []}, {"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 4}, {"code": "cur_current", "value": 221}, {"code": "cur_power", "value": 353}, {"code": "cur_voltage", "value": 2403}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}, {"id": "bfb3a145aa1b20e1e0lbdq", "status": [{"code": "va_temperature", "value": 225}, {"code": "va_humidity", "value": 56}, {"code": "battery_state", "value": "high"}, {"code": "temp_unit_convert", "value": "c"}]}, {"id": "bf19c49981834da7bdkoqe", "status": []}], "success": true, "t": 1771095001884, "tid": "f7f31e6009d511f18410e21ddda0be51"}
+[2026-02-14 19:50:01] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 19:50:02] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771049437723, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771092660400, "type": "value", "value": 226}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771092660400, "type": "value", "value": 47}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771092660400, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095002110, "tid": "f81c99d509d511f18255b6b5e3717ca9"}
+[2026-02-14 19:50:02] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 19:50:02] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771043625094, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771093797293, "type": "value", "value": 231}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771093797293, "type": "value", "value": 48}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771093797293, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095002339, "tid": "f83d914d09d511f1a0e39aa9e01ed45b"}
+[2026-02-14 19:50:02] === Widget update finished ===
+
+[2026-02-14 19:52:01] === Widget update started ===
+[2026-02-14 19:52:01] Using cached token
+[2026-02-14 19:52:01] Using cached device names
+[2026-02-14 19:52:01] API CALL: batch status request for 4 devices
+[2026-02-14 19:52:01] RESPONSE: {"result": [{"id": "bfac5ed45637af7f13fzwd", "status": []}, {"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 4}, {"code": "cur_current", "value": 221}, {"code": "cur_power", "value": 353}, {"code": "cur_voltage", "value": 2403}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}, {"id": "bfb3a145aa1b20e1e0lbdq", "status": [{"code": "va_temperature", "value": 225}, {"code": "va_humidity", "value": 56}, {"code": "battery_state", "value": "high"}, {"code": "temp_unit_convert", "value": "c"}]}, {"id": "bf19c49981834da7bdkoqe", "status": []}], "success": true, "t": 1771095121952, "tid": "3f848a4f09d611f18255b6b5e3717ca9"}
+[2026-02-14 19:52:01] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 19:52:02] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771049437723, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771092660400, "type": "value", "value": 226}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771092660400, "type": "value", "value": 47}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771092660400, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095122140, "tid": "3fab83e909d611f18410e21ddda0be51"}
+[2026-02-14 19:52:02] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 19:52:02] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771043625094, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771093797293, "type": "value", "value": 231}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771093797293, "type": "value", "value": 48}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771093797293, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095122384, "tid": "3fca4e7f09d611f18410e21ddda0be51"}
+[2026-02-14 19:52:02] === Widget update finished ===
+
+[2026-02-14 19:54:01] === Widget update started ===
+[2026-02-14 19:54:01] Using cached token
+[2026-02-14 19:54:01] Using cached device names
+[2026-02-14 19:54:01] API CALL: batch status request for 4 devices
+[2026-02-14 19:54:01] RESPONSE: {"result": [{"id": "bfac5ed45637af7f13fzwd", "status": []}, {"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 4}, {"code": "cur_current", "value": 221}, {"code": "cur_power", "value": 353}, {"code": "cur_voltage", "value": 2403}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}, {"id": "bfb3a145aa1b20e1e0lbdq", "status": [{"code": "va_temperature", "value": 225}, {"code": "va_humidity", "value": 56}, {"code": "battery_state", "value": "high"}, {"code": "temp_unit_convert", "value": "c"}]}, {"id": "bf19c49981834da7bdkoqe", "status": []}], "success": true, "t": 1771095241872, "tid": "8702d6ae09d611f1a0e39aa9e01ed45b"}
+[2026-02-14 19:54:01] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 19:54:02] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771049437723, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771092660400, "type": "value", "value": 226}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771092660400, "type": "value", "value": 47}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771092660400, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095242181, "tid": "872db91309d611f18410e21ddda0be51"}
+[2026-02-14 19:54:02] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 19:54:02] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771043625094, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771093797293, "type": "value", "value": 231}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771093797293, "type": "value", "value": 48}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771093797293, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095242414, "tid": "8756079209d611f18410e21ddda0be51"}
+[2026-02-14 19:54:02] === Widget update finished ===
+
+[2026-02-14 19:56:01] === Full update started ===
+[2026-02-14 19:56:01] Using cached token
+[2026-02-14 19:56:01] Using cached device names
+[2026-02-14 19:56:01] API CALL: batch status request for 4 devices
+[2026-02-14 19:56:01] RESPONSE: {"result": [{"id": "bfac5ed45637af7f13fzwd", "status": []}, {"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 4}, {"code": "cur_current", "value": 281}, {"code": "cur_power", "value": 539}, {"code": "cur_voltage", "value": 2390}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}, {"id": "bfb3a145aa1b20e1e0lbdq", "status": [{"code": "va_temperature", "value": 225}, {"code": "va_humidity", "value": 56}, {"code": "battery_state", "value": "high"}, {"code": "temp_unit_convert", "value": "c"}]}, {"id": "bf19c49981834da7bdkoqe", "status": []}], "success": true, "t": 1771095361900, "tid": "ce8f821109d611f18410e21ddda0be51"}
+[2026-02-14 19:56:01] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 19:56:02] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771049437723, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771092660400, "type": "value", "value": 226}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771092660400, "type": "value", "value": 47}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771092660400, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095362176, "tid": "ceb4168b09d611f18410e21ddda0be51"}
+[2026-02-14 19:56:02] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 19:56:02] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771043625094, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771093797293, "type": "value", "value": 231}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771093797293, "type": "value", "value": 48}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771093797293, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095362439, "tid": "cee44dba09d611f1a0e39aa9e01ed45b"}
+[2026-02-14 19:56:02] === Full update finished ===
+
+[2026-02-14 19:56:09] === Full update started ===
+[2026-02-14 19:56:09] Using cached token
+[2026-02-14 19:56:09] Using cached device names
+[2026-02-14 19:56:09] API CALL: batch status request for 4 devices
+[2026-02-14 19:56:09] RESPONSE: {"result": [{"id": "bfac5ed45637af7f13fzwd", "status": []}, {"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 4}, {"code": "cur_current", "value": 281}, {"code": "cur_power", "value": 539}, {"code": "cur_voltage", "value": 2390}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}, {"id": "bfb3a145aa1b20e1e0lbdq", "status": [{"code": "va_temperature", "value": 225}, {"code": "va_humidity", "value": 56}, {"code": "battery_state", "value": "high"}, {"code": "temp_unit_convert", "value": "c"}]}, {"id": "bf19c49981834da7bdkoqe", "status": []}], "success": true, "t": 1771095369417, "tid": "d304928c09d611f1a0e39aa9e01ed45b"}
+[2026-02-14 19:56:09] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 19:56:09] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771049437723, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771092660400, "type": "value", "value": 226}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771092660400, "type": "value", "value": 47}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771092660400, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095369615, "tid": "d32d14cd09d611f18255b6b5e3717ca9"}
+[2026-02-14 19:56:09] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 19:56:09] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771043625094, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771093797293, "type": "value", "value": 231}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771093797293, "type": "value", "value": 48}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771093797293, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095369793, "tid": "d349793a09d611f18410e21ddda0be51"}
+[2026-02-14 19:56:09] === Full update finished ===
+
+[2026-02-14 19:56:13] === Thermometer update started ===
+[2026-02-14 19:56:13] Using cached token
+[2026-02-14 19:56:13] API CALL: cloud.getdevices() - fetching device names
+[2026-02-14 19:56:13] === Socket update started ===
+[2026-02-14 19:56:13] Using cached token
+[2026-02-14 19:56:13] API CALL: cloud.getdevices() - fetching device names
+[2026-02-14 19:56:14] API CALL: status request for socket bfa40f3f
+[2026-02-14 19:56:14] API CALL: batch status request for 3 thermometers
+[2026-02-14 19:56:14] === Socket update finished ===
+
+[2026-02-14 19:56:14] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 19:56:15] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 19:56:15] === Thermometer update finished ===
+
+[2026-02-14 19:56:44] === Socket update started ===
+[2026-02-14 19:56:44] Using cached token
+[2026-02-14 19:56:44] Using cached device names
+[2026-02-14 19:56:44] API CALL: status request for socket bfa40f3f
+[2026-02-14 19:56:44] === Socket update finished ===
+
+[2026-02-14 19:57:14] === Socket update started ===
+[2026-02-14 19:57:14] Using cached token
+[2026-02-14 19:57:14] Using cached device names
+[2026-02-14 19:57:14] API CALL: status request for socket bfa40f3f
+[2026-02-14 19:57:14] === Socket update finished ===
+
+[2026-02-14 19:57:57] === Socket update started ===
+[2026-02-14 19:57:57] Using cached token
+[2026-02-14 19:57:57] Using cached device names
+[2026-02-14 19:57:57] API CALL: status request for socket bfa40f3f
+[2026-02-14 19:57:57] === Socket update finished ===
+
+[2026-02-14 19:58:14] === Thermometer update started ===
+[2026-02-14 19:58:14] Using cached token
+[2026-02-14 19:58:14] Using cached device names
+[2026-02-14 19:58:14] API CALL: batch status request for 3 thermometers
+[2026-02-14 19:58:14] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 19:58:14] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 19:58:14] === Thermometer update finished ===
+
+[2026-02-14 19:58:37] === Socket update started ===
+[2026-02-14 19:58:37] Using cached token
+[2026-02-14 19:58:37] Using cached device names
+[2026-02-14 19:58:37] API CALL: status request for socket bfa40f3f
+[2026-02-14 19:58:37] === Socket update finished ===
+
+[2026-02-14 19:59:17] === Socket update started ===
+[2026-02-14 19:59:17] Using cached token
+[2026-02-14 19:59:17] Using cached device names
+[2026-02-14 19:59:17] API CALL: status request for socket bfa40f3f
+[2026-02-14 19:59:17] === Socket update finished ===
+
+[2026-02-14 19:59:45] === Full update started ===
+[2026-02-14 19:59:45] Using cached token
+[2026-02-14 19:59:45] Using cached device names
+[2026-02-14 19:59:45] API CALL: batch status request for 4 devices
+[2026-02-14 19:59:46] RESPONSE: {"result": [{"id": "bfac5ed45637af7f13fzwd", "status": []}, {"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 4}, {"code": "cur_current", "value": 221}, {"code": "cur_power", "value": 349}, {"code": "cur_voltage", "value": 2390}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}, {"id": "bfb3a145aa1b20e1e0lbdq", "status": [{"code": "va_temperature", "value": 225}, {"code": "va_humidity", "value": 56}, {"code": "battery_state", "value": "high"}, {"code": "temp_unit_convert", "value": "c"}]}, {"id": "bf19c49981834da7bdkoqe", "status": []}], "success": true, "t": 1771095586152, "tid": "5439e98509d711f1a0e39aa9e01ed45b"}
+[2026-02-14 19:59:46] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 19:59:46] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771049437723, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771092660400, "type": "value", "value": 226}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771092660400, "type": "value", "value": 47}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771092660400, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095586330, "tid": "545b09ed09d711f18255b6b5e3717ca9"}
+[2026-02-14 19:59:46] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 19:59:46] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771043625094, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771093797293, "type": "value", "value": 231}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771093797293, "type": "value", "value": 48}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771093797293, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095586508, "tid": "5475f0ff09d711f18255b6b5e3717ca9"}
+[2026-02-14 19:59:46] === Full update finished ===
+
+[2026-02-14 19:59:57] === Socket update started ===
+[2026-02-14 19:59:57] Using cached token
+[2026-02-14 19:59:57] Using cached device names
+[2026-02-14 19:59:57] API CALL: status request for socket bfa40f3f
+[2026-02-14 19:59:57] === Socket update finished ===
+
+[2026-02-14 20:00:06] === Socket update started ===
+[2026-02-14 20:00:06] Using cached token
+[2026-02-14 20:00:06] Using cached device names
+[2026-02-14 20:00:06] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:00:06] === Thermometer update started ===
+[2026-02-14 20:00:06] Using cached token
+[2026-02-14 20:00:06] Using cached device names
+[2026-02-14 20:00:06] API CALL: batch status request for 3 thermometers
+[2026-02-14 20:00:07] === Socket update finished ===
+
+[2026-02-14 20:00:07] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 20:00:07] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 20:00:07] === Thermometer update finished ===
+
+[2026-02-14 20:00:31] === Full update started ===
+[2026-02-14 20:00:31] Using cached token
+[2026-02-14 20:00:31] Using cached device names
+[2026-02-14 20:00:31] API CALL: batch status request for 4 devices
+[2026-02-14 20:00:31] RESPONSE: {"result": [{"id": "bfac5ed45637af7f13fzwd", "status": []}, {"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 17}, {"code": "cur_current", "value": 336}, {"code": "cur_power", "value": 429}, {"code": "cur_voltage", "value": 2381}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}, {"id": "bfb3a145aa1b20e1e0lbdq", "status": [{"code": "va_temperature", "value": 225}, {"code": "va_humidity", "value": 56}, {"code": "battery_state", "value": "high"}, {"code": "temp_unit_convert", "value": "c"}]}, {"id": "bf19c49981834da7bdkoqe", "status": []}], "success": true, "t": 1771095631501, "tid": "6f40ea6309d711f18410e21ddda0be51"}
+[2026-02-14 20:00:31] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 20:00:31] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771049437723, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771092660400, "type": "value", "value": 226}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771092660400, "type": "value", "value": 47}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771092660400, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095631693, "tid": "6f63333209d711f18410e21ddda0be51"}
+[2026-02-14 20:00:31] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 20:00:31] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771043625094, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771093797293, "type": "value", "value": 231}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771093797293, "type": "value", "value": 48}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771093797293, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095631888, "tid": "6f7f48a909d711f18255b6b5e3717ca9"}
+[2026-02-14 20:00:31] === Full update finished ===
+
+[2026-02-14 20:00:46] === Socket update started ===
+[2026-02-14 20:00:46] Using cached token
+[2026-02-14 20:00:46] Using cached device names
+[2026-02-14 20:00:46] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:00:47] === Socket update finished ===
+
+[2026-02-14 20:01:19] === Full update started ===
+[2026-02-14 20:01:19] Using cached token
+[2026-02-14 20:01:19] Using cached device names
+[2026-02-14 20:01:19] API CALL: batch status request for 4 devices
+[2026-02-14 20:01:19] RESPONSE: {"result": [{"id": "bfac5ed45637af7f13fzwd", "status": []}, {"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 17}, {"code": "cur_current", "value": 336}, {"code": "cur_power", "value": 429}, {"code": "cur_voltage", "value": 2381}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}, {"id": "bfb3a145aa1b20e1e0lbdq", "status": [{"code": "va_temperature", "value": 225}, {"code": "va_humidity", "value": 56}, {"code": "battery_state", "value": "high"}, {"code": "temp_unit_convert", "value": "c"}]}, {"id": "bf19c49981834da7bdkoqe", "status": []}], "success": true, "t": 1771095679441, "tid": "8bd5d63109d711f1a0e39aa9e01ed45b"}
+[2026-02-14 20:01:19] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 20:01:19] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771049437723, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771092660400, "type": "value", "value": 226}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771092660400, "type": "value", "value": 47}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771092660400, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095679672, "tid": "8bfc2f7109d711f1a0e39aa9e01ed45b"}
+[2026-02-14 20:01:19] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 20:01:19] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771043625094, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771093797293, "type": "value", "value": 231}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771093797293, "type": "value", "value": 48}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771093797293, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095679882, "tid": "8c1d6a5309d711f18410e21ddda0be51"}
+[2026-02-14 20:01:19] === Full update finished ===
+
+[2026-02-14 20:01:32] === Full update started ===
+[2026-02-14 20:01:32] Using cached token
+[2026-02-14 20:01:32] Using cached device names
+[2026-02-14 20:01:32] API CALL: batch status request for 4 devices
+[2026-02-14 20:01:33] RESPONSE: {"result": [{"id": "bfac5ed45637af7f13fzwd", "status": []}, {"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 17}, {"code": "cur_current", "value": 336}, {"code": "cur_power", "value": 429}, {"code": "cur_voltage", "value": 2381}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}, {"id": "bfb3a145aa1b20e1e0lbdq", "status": [{"code": "va_temperature", "value": 225}, {"code": "va_humidity", "value": 56}, {"code": "battery_state", "value": "high"}, {"code": "temp_unit_convert", "value": "c"}]}, {"id": "bf19c49981834da7bdkoqe", "status": []}], "success": true, "t": 1771095693198, "tid": "9407f6b809d711f18255b6b5e3717ca9"}
+[2026-02-14 20:01:33] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 20:01:33] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771049437723, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771092660400, "type": "value", "value": 226}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771092660400, "type": "value", "value": 47}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771092660400, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095693378, "tid": "942984b109d711f18255b6b5e3717ca9"}
+[2026-02-14 20:01:33] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 20:01:33] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771043625094, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771093797293, "type": "value", "value": 231}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771093797293, "type": "value", "value": 48}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771093797293, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095693557, "tid": "94441bca09d711f1a0e39aa9e01ed45b"}
+[2026-02-14 20:01:33] === Full update finished ===
+
+[2026-02-14 20:01:34] === Thermometer update started ===
+[2026-02-14 20:01:34] Using cached token
+[2026-02-14 20:01:34] Using cached device names
+[2026-02-14 20:01:34] API CALL: batch status request for 3 thermometers
+[2026-02-14 20:01:34] === Socket update started ===
+[2026-02-14 20:01:34] Using cached token
+[2026-02-14 20:01:34] Using cached device names
+[2026-02-14 20:01:34] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:01:34] === Socket update finished ===
+
+[2026-02-14 20:01:34] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 20:01:34] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 20:01:34] === Thermometer update finished ===
+
+[2026-02-14 20:02:14] === Socket update started ===
+[2026-02-14 20:02:14] Using cached token
+[2026-02-14 20:02:14] Using cached device names
+[2026-02-14 20:02:14] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:02:14] === Socket update finished ===
+
+[2026-02-14 20:02:50] === Full update started ===
+[2026-02-14 20:02:50] Using cached token
+[2026-02-14 20:02:50] Using cached device names
+[2026-02-14 20:02:50] API CALL: batch status request for 4 devices
+[2026-02-14 20:02:50] RESPONSE: {"result": [{"id": "bfac5ed45637af7f13fzwd", "status": []}, {"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 17}, {"code": "cur_current", "value": 336}, {"code": "cur_power", "value": 429}, {"code": "cur_voltage", "value": 2381}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}, {"id": "bfb3a145aa1b20e1e0lbdq", "status": [{"code": "va_temperature", "value": 225}, {"code": "va_humidity", "value": 56}, {"code": "battery_state", "value": "high"}, {"code": "temp_unit_convert", "value": "c"}]}, {"id": "bf19c49981834da7bdkoqe", "status": []}], "success": true, "t": 1771095770466, "tid": "c2162c3b09d711f1a0e39aa9e01ed45b"}
+[2026-02-14 20:02:50] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 20:02:50] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771049437723, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771092660400, "type": "value", "value": 226}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771092660400, "type": "value", "value": 47}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771092660400, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095770725, "tid": "c237ab5409d711f18255b6b5e3717ca9"}
+[2026-02-14 20:02:50] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 20:02:50] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771043625094, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771093797293, "type": "value", "value": 231}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771093797293, "type": "value", "value": 48}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771093797293, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095770905, "tid": "c25dc38b09d711f1a0e39aa9e01ed45b"}
+[2026-02-14 20:02:50] === Full update finished ===
+
+[2026-02-14 20:02:54] === Socket update started ===
+[2026-02-14 20:02:54] Using cached token
+[2026-02-14 20:02:54] Using cached device names
+[2026-02-14 20:02:54] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:02:54] === Socket update finished ===
+
+[2026-02-14 20:02:58] === Full update started ===
+[2026-02-14 20:02:58] Using cached token
+[2026-02-14 20:02:58] Using cached device names
+[2026-02-14 20:02:58] API CALL: batch status request for 4 devices
+[2026-02-14 20:02:59] RESPONSE: {"result": [{"id": "bfac5ed45637af7f13fzwd", "status": []}, {"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 17}, {"code": "cur_current", "value": 336}, {"code": "cur_power", "value": 429}, {"code": "cur_voltage", "value": 2381}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}, {"id": "bfb3a145aa1b20e1e0lbdq", "status": [{"code": "va_temperature", "value": 225}, {"code": "va_humidity", "value": 56}, {"code": "battery_state", "value": "high"}, {"code": "temp_unit_convert", "value": "c"}]}, {"id": "bf19c49981834da7bdkoqe", "status": []}], "success": true, "t": 1771095778987, "tid": "c724592409d711f1a0e39aa9e01ed45b"}
+[2026-02-14 20:02:59] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 20:02:59] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771049437723, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771092660400, "type": "value", "value": 226}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771092660400, "type": "value", "value": 47}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771092660400, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095779186, "tid": "c74b85d609d711f18410e21ddda0be51"}
+[2026-02-14 20:02:59] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 20:02:59] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771043625094, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771093797293, "type": "value", "value": 231}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771093797293, "type": "value", "value": 48}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771093797293, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095779413, "tid": "c76b474b09d711f18410e21ddda0be51"}
+[2026-02-14 20:02:59] === Full update finished ===
+
+[2026-02-14 20:03:00] === Socket update started ===
+[2026-02-14 20:03:00] Using cached token
+[2026-02-14 20:03:00] Using cached device names
+[2026-02-14 20:03:00] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:03:00] === Thermometer update started ===
+[2026-02-14 20:03:00] Using cached token
+[2026-02-14 20:03:00] Using cached device names
+[2026-02-14 20:03:00] API CALL: batch status request for 3 thermometers
+[2026-02-14 20:03:00] === Socket update finished ===
+
+[2026-02-14 20:03:00] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 20:03:00] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 20:03:00] === Thermometer update finished ===
+
+[2026-02-14 20:03:40] === Socket update started ===
+[2026-02-14 20:03:40] Using cached token
+[2026-02-14 20:03:40] Using cached device names
+[2026-02-14 20:03:40] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:03:41] === Socket update finished ===
+
+[2026-02-14 20:03:52] === Socket update started ===
+[2026-02-14 20:03:52] Using cached token
+[2026-02-14 20:03:52] Using cached device names
+[2026-02-14 20:03:52] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:03:52] === Thermometer update started ===
+[2026-02-14 20:03:52] Using cached token
+[2026-02-14 20:03:52] Using cached device names
+[2026-02-14 20:03:52] API CALL: batch status request for 3 thermometers
+[2026-02-14 20:03:52] === Socket update finished ===
+
+[2026-02-14 20:03:52] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 20:03:52] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 20:03:53] === Thermometer update finished ===
+
+[2026-02-14 20:04:12] === Full update started ===
+[2026-02-14 20:04:12] Using cached token
+[2026-02-14 20:04:12] Using cached device names
+[2026-02-14 20:04:12] API CALL: batch status request for 4 devices
+[2026-02-14 20:04:12] RESPONSE: {"result": [{"id": "bfac5ed45637af7f13fzwd", "status": []}, {"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 17}, {"code": "cur_current", "value": 336}, {"code": "cur_power", "value": 429}, {"code": "cur_voltage", "value": 2381}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}, {"id": "bfb3a145aa1b20e1e0lbdq", "status": [{"code": "va_temperature", "value": 222}, {"code": "va_humidity", "value": 56}, {"code": "battery_state", "value": "high"}, {"code": "temp_unit_convert", "value": "c"}]}, {"id": "bf19c49981834da7bdkoqe", "status": []}], "success": true, "t": 1771095852780, "tid": "f326627109d711f18255b6b5e3717ca9"}
+[2026-02-14 20:04:12] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 20:04:13] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771049437723, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771092660400, "type": "value", "value": 226}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771092660400, "type": "value", "value": 47}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771092660400, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095852988, "tid": "f346d80f09d711f1a0e39aa9e01ed45b"}
+[2026-02-14 20:04:13] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 20:04:13] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771043625094, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771093797293, "type": "value", "value": 231}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771093797293, "type": "value", "value": 48}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771093797293, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095853169, "tid": "f366d90d09d711f18255b6b5e3717ca9"}
+[2026-02-14 20:04:13] === Full update finished ===
+
+[2026-02-14 20:04:21] === Full update started ===
+[2026-02-14 20:04:21] Using cached token
+[2026-02-14 20:04:21] Using cached device names
+[2026-02-14 20:04:21] API CALL: batch status request for 4 devices
+[2026-02-14 20:04:21] RESPONSE: {"result": [{"id": "bfac5ed45637af7f13fzwd", "status": []}, {"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 17}, {"code": "cur_current", "value": 336}, {"code": "cur_power", "value": 429}, {"code": "cur_voltage", "value": 2381}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}, {"id": "bfb3a145aa1b20e1e0lbdq", "status": [{"code": "va_temperature", "value": 222}, {"code": "va_humidity", "value": 56}, {"code": "battery_state", "value": "high"}, {"code": "temp_unit_convert", "value": "c"}]}, {"id": "bf19c49981834da7bdkoqe", "status": []}], "success": true, "t": 1771095861465, "tid": "f8534a0109d711f1a0e39aa9e01ed45b"}
+[2026-02-14 20:04:21] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 20:04:21] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771049437723, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771092660400, "type": "value", "value": 226}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771092660400, "type": "value", "value": 47}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771092660400, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095861713, "tid": "f874e86e09d711f18410e21ddda0be51"}
+[2026-02-14 20:04:21] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 20:04:21] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771043625094, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771093797293, "type": "value", "value": 231}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771093797293, "type": "value", "value": 48}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771093797293, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095861910, "tid": "f89a9d8209d711f1a0e39aa9e01ed45b"}
+[2026-02-14 20:04:21] === Full update finished ===
+
+[2026-02-14 20:04:22] === Socket update started ===
+[2026-02-14 20:04:22] Using cached token
+[2026-02-14 20:04:22] Using cached device names
+[2026-02-14 20:04:22] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:04:22] === Thermometer update started ===
+[2026-02-14 20:04:22] Using cached token
+[2026-02-14 20:04:22] Using cached device names
+[2026-02-14 20:04:22] API CALL: batch status request for 3 thermometers
+[2026-02-14 20:04:22] === Socket update finished ===
+
+[2026-02-14 20:04:22] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 20:04:23] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 20:04:23] === Thermometer update finished ===
+
+[2026-02-14 20:05:03] === Socket update started ===
+[2026-02-14 20:05:03] Using cached token
+[2026-02-14 20:05:03] Using cached device names
+[2026-02-14 20:05:03] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:05:03] === Socket update finished ===
+
+[2026-02-14 20:05:37] === Full update started ===
+[2026-02-14 20:05:37] Using cached token
+[2026-02-14 20:05:37] Using cached device names
+[2026-02-14 20:05:37] API CALL: batch status request for 4 devices
+[2026-02-14 20:05:37] RESPONSE: {"result": [{"id": "bfac5ed45637af7f13fzwd", "status": []}, {"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 17}, {"code": "cur_current", "value": 336}, {"code": "cur_power", "value": 429}, {"code": "cur_voltage", "value": 2381}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}, {"id": "bfb3a145aa1b20e1e0lbdq", "status": [{"code": "va_temperature", "value": 222}, {"code": "va_humidity", "value": 56}, {"code": "battery_state", "value": "high"}, {"code": "temp_unit_convert", "value": "c"}]}, {"id": "bf19c49981834da7bdkoqe", "status": []}], "success": true, "t": 1771095937351, "tid": "258ef4a209d811f18255b6b5e3717ca9"}
+[2026-02-14 20:05:37] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 20:05:37] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771049437723, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771092660400, "type": "value", "value": 226}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771092660400, "type": "value", "value": 47}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771092660400, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095937543, "tid": "25af94c109d811f18255b6b5e3717ca9"}
+[2026-02-14 20:05:37] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 20:05:37] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771043625094, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771093797293, "type": "value", "value": 231}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771093797293, "type": "value", "value": 48}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771093797293, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095937742, "tid": "25cefd5e09d811f18410e21ddda0be51"}
+[2026-02-14 20:05:37] === Full update finished ===
+
+[2026-02-14 20:05:41] === Full update started ===
+[2026-02-14 20:05:41] Using cached token
+[2026-02-14 20:05:41] Using cached device names
+[2026-02-14 20:05:41] API CALL: batch status request for 4 devices
+[2026-02-14 20:05:42] RESPONSE: {"result": [{"id": "bfac5ed45637af7f13fzwd", "status": []}, {"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 17}, {"code": "cur_current", "value": 336}, {"code": "cur_power", "value": 429}, {"code": "cur_voltage", "value": 2381}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}, {"id": "bfb3a145aa1b20e1e0lbdq", "status": [{"code": "va_temperature", "value": 222}, {"code": "va_humidity", "value": 56}, {"code": "battery_state", "value": "high"}, {"code": "temp_unit_convert", "value": "c"}]}, {"id": "bf19c49981834da7bdkoqe", "status": []}], "success": true, "t": 1771095942029, "tid": "2856d5e409d811f1a0e39aa9e01ed45b"}
+[2026-02-14 20:05:42] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 20:05:42] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771049437723, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771092660400, "type": "value", "value": 226}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771092660400, "type": "value", "value": 47}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771092660400, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095942224, "tid": "2878d40c09d811f1a0e39aa9e01ed45b"}
+[2026-02-14 20:05:42] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 20:05:42] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771043625094, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771093797293, "type": "value", "value": 231}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771093797293, "type": "value", "value": 48}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771093797293, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095942412, "tid": "2896d58c09d811f18410e21ddda0be51"}
+[2026-02-14 20:05:42] === Full update finished ===
+
+[2026-02-14 20:05:43] === Socket update started ===
+[2026-02-14 20:05:43] Using cached token
+[2026-02-14 20:05:43] Using cached device names
+[2026-02-14 20:05:43] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:05:43] === Thermometer update started ===
+[2026-02-14 20:05:43] Using cached token
+[2026-02-14 20:05:43] Using cached device names
+[2026-02-14 20:05:43] API CALL: batch status request for 3 thermometers
+[2026-02-14 20:05:43] === Socket update finished ===
+
+[2026-02-14 20:05:43] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 20:05:43] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 20:05:43] === Thermometer update finished ===
+
+[2026-02-14 20:06:16] === Full update started ===
+[2026-02-14 20:06:16] Using cached token
+[2026-02-14 20:06:16] Using cached device names
+[2026-02-14 20:06:16] API CALL: batch status request for 4 devices
+[2026-02-14 20:06:17] RESPONSE: {"result": [{"id": "bfac5ed45637af7f13fzwd", "status": []}, {"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 17}, {"code": "cur_current", "value": 336}, {"code": "cur_power", "value": 429}, {"code": "cur_voltage", "value": 2381}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}, {"id": "bfb3a145aa1b20e1e0lbdq", "status": [{"code": "va_temperature", "value": 222}, {"code": "va_humidity", "value": 56}, {"code": "battery_state", "value": "high"}, {"code": "temp_unit_convert", "value": "c"}]}, {"id": "bf19c49981834da7bdkoqe", "status": []}], "success": true, "t": 1771095976958, "tid": "3d293a9209d811f18255b6b5e3717ca9"}
+[2026-02-14 20:06:17] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 20:06:17] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771049437723, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771092660400, "type": "value", "value": 226}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771092660400, "type": "value", "value": 47}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771092660400, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095977141, "tid": "3d4bf55509d811f18410e21ddda0be51"}
+[2026-02-14 20:06:17] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 20:06:17] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771043625094, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771093797293, "type": "value", "value": 231}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771093797293, "type": "value", "value": 48}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771093797293, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095977323, "tid": "3d66bddf09d811f18255b6b5e3717ca9"}
+[2026-02-14 20:06:17] === Full update finished ===
+
+[2026-02-14 20:06:22] === Full update started ===
+[2026-02-14 20:06:22] Using cached token
+[2026-02-14 20:06:22] Using cached device names
+[2026-02-14 20:06:22] API CALL: batch status request for 4 devices
+[2026-02-14 20:06:22] RESPONSE: {"result": [{"id": "bfac5ed45637af7f13fzwd", "status": []}, {"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 17}, {"code": "cur_current", "value": 336}, {"code": "cur_power", "value": 429}, {"code": "cur_voltage", "value": 2381}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}, {"id": "bfb3a145aa1b20e1e0lbdq", "status": [{"code": "va_temperature", "value": 222}, {"code": "va_humidity", "value": 56}, {"code": "battery_state", "value": "high"}, {"code": "temp_unit_convert", "value": "c"}]}, {"id": "bf19c49981834da7bdkoqe", "status": []}], "success": true, "t": 1771095982252, "tid": "40506a5b09d811f1a0e39aa9e01ed45b"}
+[2026-02-14 20:06:22] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 20:06:22] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771049437723, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771092660400, "type": "value", "value": 226}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771092660400, "type": "value", "value": 47}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771092660400, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095982428, "tid": "4071e6c809d811f18410e21ddda0be51"}
+[2026-02-14 20:06:22] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 20:06:22] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771043625094, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771093797293, "type": "value", "value": 231}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771093797293, "type": "value", "value": 48}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771093797293, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771095982599, "tid": "408cb2be09d811f18410e21ddda0be51"}
+[2026-02-14 20:06:22] === Full update finished ===
+
+[2026-02-14 20:06:23] === Thermometer update started ===
+[2026-02-14 20:06:23] Using cached token
+[2026-02-14 20:06:23] Using cached device names
+[2026-02-14 20:06:23] API CALL: batch status request for 3 thermometers
+[2026-02-14 20:06:23] === Socket update started ===
+[2026-02-14 20:06:23] Using cached token
+[2026-02-14 20:06:23] Using cached device names
+[2026-02-14 20:06:23] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:06:23] === Socket update finished ===
+
+[2026-02-14 20:06:23] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 20:06:23] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 20:06:24] === Thermometer update finished ===
+
+[2026-02-14 20:07:03] === Socket update started ===
+[2026-02-14 20:07:03] Using cached token
+[2026-02-14 20:07:03] Using cached device names
+[2026-02-14 20:07:03] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:07:03] === Socket update finished ===
+
+[2026-02-14 20:07:43] === Socket update started ===
+[2026-02-14 20:07:43] Using cached token
+[2026-02-14 20:07:43] Using cached device names
+[2026-02-14 20:07:43] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:07:43] === Socket update finished ===
+
+[2026-02-14 20:08:23] === Thermometer update started ===
+[2026-02-14 20:08:23] Using cached token
+[2026-02-14 20:08:23] Using cached device names
+[2026-02-14 20:08:23] API CALL: batch status request for 3 thermometers
+[2026-02-14 20:08:23] === Socket update started ===
+[2026-02-14 20:08:23] Using cached token
+[2026-02-14 20:08:23] Using cached device names
+[2026-02-14 20:08:23] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:08:23] === Socket update finished ===
+
+[2026-02-14 20:08:23] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 20:08:23] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 20:08:24] === Thermometer update finished ===
+
+[2026-02-14 20:08:57] === Socket update started ===
+[2026-02-14 20:08:57] Using cached token
+[2026-02-14 20:08:57] Using cached device names
+[2026-02-14 20:08:57] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:08:57] RESPONSE: {"result": [{"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 17}, {"code": "cur_current", "value": 211}, {"code": "cur_power", "value": 324}, {"code": "cur_voltage", "value": 2394}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}], "success": true, "t": 1771096137388, "tid": "9cc490b209d811f18255b6b5e3717ca9"}
+[2026-02-14 20:08:57] === Socket update finished ===
+
+[2026-02-14 20:09:03] === Socket update started ===
+[2026-02-14 20:09:03] Using cached token
+[2026-02-14 20:09:03] Using cached device names
+[2026-02-14 20:09:03] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:09:03] RESPONSE: {"result": [{"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 17}, {"code": "cur_current", "value": 211}, {"code": "cur_power", "value": 324}, {"code": "cur_voltage", "value": 2394}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}], "success": true, "t": 1771096143735, "tid": "a09718d809d811f18410e21ddda0be51"}
+[2026-02-14 20:09:03] === Socket update finished ===
+
+[2026-02-14 20:09:17] === Full update started ===
+[2026-02-14 20:09:17] Using cached token
+[2026-02-14 20:09:17] Using cached device names
+[2026-02-14 20:09:17] API CALL: batch status request for 4 devices
+[2026-02-14 20:09:17] RESPONSE: {"result": [{"id": "bfac5ed45637af7f13fzwd", "status": []}, {"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 17}, {"code": "cur_current", "value": 211}, {"code": "cur_power", "value": 324}, {"code": "cur_voltage", "value": 2394}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}, {"id": "bfb3a145aa1b20e1e0lbdq", "status": [{"code": "va_temperature", "value": 222}, {"code": "va_humidity", "value": 56}, {"code": "battery_state", "value": "high"}, {"code": "temp_unit_convert", "value": "c"}]}, {"id": "bf19c49981834da7bdkoqe", "status": []}], "success": true, "t": 1771096157272, "tid": "a8a4f33509d811f18255b6b5e3717ca9"}
+[2026-02-14 20:09:17] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 20:09:17] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771049437723, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771092660400, "type": "value", "value": 226}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771092660400, "type": "value", "value": 47}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771092660400, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771096157450, "tid": "a8c47b5809d811f18255b6b5e3717ca9"}
+[2026-02-14 20:09:17] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 20:09:17] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771043625094, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771093797293, "type": "value", "value": 231}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771093797293, "type": "value", "value": 48}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771093797293, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771096157703, "tid": "a8e1723609d811f18410e21ddda0be51"}
+[2026-02-14 20:09:17] === Full update finished ===
+
+[2026-02-14 20:09:24] === Full update started ===
+[2026-02-14 20:09:24] Using cached token
+[2026-02-14 20:09:24] Using cached device names
+[2026-02-14 20:09:24] API CALL: batch status request for 4 devices
+[2026-02-14 20:09:25] RESPONSE: {"result": [{"id": "bfac5ed45637af7f13fzwd", "status": []}, {"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 17}, {"code": "cur_current", "value": 211}, {"code": "cur_power", "value": 324}, {"code": "cur_voltage", "value": 2394}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}, {"id": "bfb3a145aa1b20e1e0lbdq", "status": [{"code": "va_temperature", "value": 222}, {"code": "va_humidity", "value": 56}, {"code": "battery_state", "value": "high"}, {"code": "temp_unit_convert", "value": "c"}]}, {"id": "bf19c49981834da7bdkoqe", "status": []}], "success": true, "t": 1771096164992, "tid": "ad3f995409d811f18410e21ddda0be51"}
+[2026-02-14 20:09:25] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 20:09:25] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771049437723, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771092660400, "type": "value", "value": 226}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771092660400, "type": "value", "value": 47}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771092660400, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771096165165, "tid": "ad5e6a3e09d811f18410e21ddda0be51"}
+[2026-02-14 20:09:25] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 20:09:25] RESPONSE: {"result": {"properties": [{"code": "temp_unit_convert", "custom_name": "", "dp_id": 20, "time": 1771043625094, "type": "enum", "value": "c"}, {"code": "temp_current", "custom_name": "", "dp_id": 27, "time": 1771093797293, "type": "value", "value": 231}, {"code": "humidity_value", "custom_name": "", "dp_id": 46, "time": 1771093797293, "type": "value", "value": 48}, {"code": "battery_state", "custom_name": "", "dp_id": 101, "time": 1771093797293, "type": "enum", "value": "middle"}]}, "success": true, "t": 1771096165369, "tid": "ad78e05309d811f1a0e39aa9e01ed45b"}
+[2026-02-14 20:09:25] === Full update finished ===
+
+[2026-02-14 20:09:26] === Thermometer update started ===
+[2026-02-14 20:09:26] Using cached token
+[2026-02-14 20:09:26] Using cached device names
+[2026-02-14 20:09:26] API CALL: batch status request for 3 thermometers
+[2026-02-14 20:09:26] === Socket update started ===
+[2026-02-14 20:09:26] Using cached token
+[2026-02-14 20:09:26] Using cached device names
+[2026-02-14 20:09:26] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:09:26] RESPONSE: {"result": [{"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 17}, {"code": "cur_current", "value": 211}, {"code": "cur_power", "value": 324}, {"code": "cur_voltage", "value": 2394}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}], "success": true, "t": 1771096166283, "tid": "ae0844fb09d811f18255b6b5e3717ca9"}
+[2026-02-14 20:09:26] === Socket update finished ===
+
+[2026-02-14 20:09:26] API CALL: shadow properties for device bfac5ed4 (fallback)
+[2026-02-14 20:09:26] API CALL: shadow properties for device bf19c499 (fallback)
+[2026-02-14 20:09:26] === Thermometer update finished ===
+
+[2026-02-14 20:10:06] === Socket update started ===
+[2026-02-14 20:10:06] Using cached token
+[2026-02-14 20:10:06] Using cached device names
+[2026-02-14 20:10:06] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:10:06] RESPONSE: {"result": [{"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 17}, {"code": "cur_current", "value": 210}, {"code": "cur_power", "value": 311}, {"code": "cur_voltage", "value": 2386}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}], "success": true, "t": 1771096206374, "tid": "c5ee427209d811f18255b6b5e3717ca9"}
+[2026-02-14 20:10:06] === Socket update finished ===
+
+[2026-02-14 20:10:46] === Socket update started ===
+[2026-02-14 20:10:46] Using cached token
+[2026-02-14 20:10:46] Using cached device names
+[2026-02-14 20:10:46] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:10:46] RESPONSE: {"result": [{"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 17}, {"code": "cur_current", "value": 210}, {"code": "cur_power", "value": 311}, {"code": "cur_voltage", "value": 2386}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}], "success": true, "t": 1771096246426, "tid": "ddc8d82609d811f18410e21ddda0be51"}
+[2026-02-14 20:10:46] === Socket update finished ===
+
+[2026-02-14 20:11:26] === Socket update started ===
+[2026-02-14 20:11:26] Using cached token
+[2026-02-14 20:11:26] Using cached device names
+[2026-02-14 20:11:26] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:11:26] RESPONSE: {"result": [{"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 17}, {"code": "cur_current", "value": 210}, {"code": "cur_power", "value": 311}, {"code": "cur_voltage", "value": 2386}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}], "success": true, "t": 1771096286882, "tid": "f5e046aa09d811f18410e21ddda0be51"}
+[2026-02-14 20:11:26] === Socket update finished ===
+
+[2026-02-14 20:12:06] === Socket update started ===
+[2026-02-14 20:12:06] Using cached token
+[2026-02-14 20:12:06] Using cached device names
+[2026-02-14 20:12:06] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:12:06] RESPONSE: {"result": [{"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 17}, {"code": "cur_current", "value": 210}, {"code": "cur_power", "value": 311}, {"code": "cur_voltage", "value": 2386}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}], "success": true, "t": 1771096326918, "tid": "0dc658e509d911f18410e21ddda0be51"}
+[2026-02-14 20:12:06] === Socket update finished ===
+
+[2026-02-14 20:12:46] === Socket update started ===
+[2026-02-14 20:12:46] Using cached token
+[2026-02-14 20:12:46] Using cached device names
+[2026-02-14 20:12:46] API CALL: status request for socket bfa40f3f
+[2026-02-14 20:12:46] RESPONSE: {"result": [{"id": "bfa40f3f2c34945e3cae3b", "status": [{"code": "switch_1", "value": true}, {"code": "countdown_1", "value": 0}, {"code": "add_ele", "value": 17}, {"code": "cur_current", "value": 210}, {"code": "cur_power", "value": 311}, {"code": "cur_voltage", "value": 2386}, {"code": "test_bit", "value": 1}, {"code": "fault", "value": 0}, {"code": "relay_status", "value": "2"}, {"code": "random_time", "value": ""}, {"code": "cycle_time", "value": ""}, {"code": "switch_inching", "value": "AAAC"}]}], "success": true, "t": 1771096366922, "tid": "259e624509d911f18255b6b5e3717ca9"}
+[2026-02-14 20:12:46] === Socket update finished ===
+
