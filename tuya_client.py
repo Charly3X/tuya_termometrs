@@ -10,20 +10,23 @@ OUTPUT_FILE = Path(__file__).parent / "data.json"
 CACHE_FILE = Path(__file__).parent / "device_names_cache.json"
 TOKEN_CACHE_FILE = Path(__file__).parent / "token_cache.json"
 LOG_FILE = Path(__file__).parent / "api_calls.log"
+LOGGING_ENABLED = False
 
 def log_api_call(message):
+    if not LOGGING_ENABLED:
+        return
     with open(LOG_FILE, 'a') as f:
         f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}\n")
 
 def trim_log_file():
-    if not LOG_FILE.exists():
+    if not LOGGING_ENABLED or not LOG_FILE.exists():
         return
     
     with open(LOG_FILE, 'r') as f:
         lines = f.readlines()
     
-    # Find last 3 "Widget update started" occurrences
-    starts = [i for i, line in enumerate(lines) if "Widget update started" in line]
+    # Find last 3 update cycles (any type)
+    starts = [i for i, line in enumerate(lines) if "update started" in line]
     
     if len(starts) > 3:
         # Keep only last 3 cycles
@@ -318,7 +321,8 @@ def get_all_data():
     return {"temperatures": temps, "humidity": humids, "names": names, "batteries": batteries, "socket": socket_data, "last_update": datetime.now().strftime("%H:%M:%S")}
 
 if __name__ == "__main__":
-    mode = sys.argv[1] if len(sys.argv) > 1 else "all"
+    LOGGING_ENABLED = "--log" in sys.argv
+    mode = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] != "--log" else "all"
     
     if mode == "thermometers":
         log_api_call("=== Thermometer update started ===")

@@ -17,5 +17,8 @@
         <entry name="socketUpdateInterval" type="Int">
             <default>30</default>
         </entry>
+        <entry name="enableLogging" type="Bool">
+            <default>false</default>
+        </entry>
     </group>
 </kcfg>

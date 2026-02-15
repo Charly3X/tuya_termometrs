@@ -9,6 +9,7 @@ Kirigami.FormLayout {
     property alias cfg_thermometerUpdateInterval: thermometerInterval.value
     property alias cfg_socketUpdateInterval: socketInterval.value
     property alias cfg_backgroundOpacity: opacitySlider.value
+    property alias cfg_enableLogging: loggingCheckbox.checked
     
     QQC2.SpinBox {
         id: thermometerInterval
@@ -32,5 +33,10 @@ Kirigami.FormLayout {
         from: 0.0
         to: 1.0
         stepSize: 0.1
+    }
+    
+    QQC2.CheckBox {
+        id: loggingCheckbox
+        Kirigami.FormData.label: "Enable logging:"
     }
 }

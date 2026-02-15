@@ -69,11 +69,17 @@ PlasmoidItem {
     
     function updateThermometers() {
         var cmd = "/home/charoyan/projects/tuya/venv/bin/python3 /home/charoyan/projects/tuya/tuya_client.py thermometers"
+        if (Plasmoid.configuration.enableLogging) {
+            cmd += " --log"
+        }
         executable.connectSource(cmd)
     }
     
     function updateSocket() {
         var cmd = "/home/charoyan/projects/tuya/venv/bin/python3 /home/charoyan/projects/tuya/tuya_client.py socket"
+        if (Plasmoid.configuration.enableLogging) {
+            cmd += " --log"
+        }
         executable.connectSource(cmd)
     }
     
