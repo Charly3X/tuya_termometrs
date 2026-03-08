@@ -4,6 +4,13 @@ import sys
 from pathlib import Path
 from datetime import datetime
 import tinytuya
+from tuya_local import (
+    get_local_temperatures,
+    get_local_socket_data,
+    get_local_all_data,
+    log_local_call
+)
+from tuya_history import add_readings, get_device_history
 
 CONFIG_FILE = Path(__file__).parent / "config.json"
 OUTPUT_FILE = Path(__file__).parent / "data.json"
@@ -99,9 +106,13 @@ def get_cloud_and_device_map(config):
     
     device_map = load_device_names_cache()
     if device_map is None:
-        log_api_call("API CALL: cloud.getdevices() - fetching device names")
-        all_devices = cloud.getdevices()
-        device_map = {d["id"]: d["name"] for d in all_devices}
+        log_api_call("API CALL: fetching device names")
+        # Use config devices as fallback
+        device_map = {}
+        for device_id in config.get("devices", []):
+            device_map[device_id] = device_id[:8]  # Use short ID as name
+        if "socket" in config:
+            device_map[config["socket"]] = "Socket"
         save_device_names_cache(device_map)
     else:
         log_api_call("Using cached device names")
@@ -322,22 +333,163 @@ def get_all_data():
 
 if __name__ == "__main__":
     LOGGING_ENABLED = "--log" in sys.argv
-    mode = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] != "--log" else "all"
     
-    if mode == "thermometers":
-        log_api_call("=== Thermometer update started ===")
-        result = get_temperatures()
-        log_api_call("=== Thermometer update finished ===\n")
-    elif mode == "socket":
-        log_api_call("=== Socket update started ===")
-        result = get_socket_data()
-        log_api_call("=== Socket update finished ===\n")
+    # Parse arguments
+    args = [arg for arg in sys.argv[1:] if arg != "--log"]
+    mode = args[0] if len(args) > 0 else "all"
+    connection_mode = args[1] if len(args) > 1 else "cloud"
+    
+    # History mode: output chart data and exit
+    if mode == "history":
+        device_id = args[1] if len(args) > 1 else ""
+        hours = int(args[2]) if len(args) > 2 else 1
+        history = get_device_history(device_id, hours)
+        print(json.dumps({"history": history, "history_device": device_id}))
+        sys.exit(0)
+    
+    # Load config
+    config = load_config()
+    
+    # Smart mode: try local first, fallback to cloud
+    if connection_mode == "smart":
+        log_api_call("=== SMART MODE: trying local first ===")
+        
+        # Check if local config exists
+        has_local_config = config and (
+            config.get('local_devices') or config.get('local_socket')
+        )
+        
+        if has_local_config:
+            log_api_call("Local config found, attempting local connection...")
+            try:
+                if mode == "thermometers":
+                    result = get_local_temperatures(config, log_api_call if LOGGING_ENABLED else None)
+                elif mode == "socket":
+                    result = get_local_socket_data(config, log_api_call if LOGGING_ENABLED else None)
+                else:
+                    result = get_local_all_data(config, log_api_call if LOGGING_ENABLED else None)
+                
+                # Check if we got valid data
+                has_thermo_data = False
+                has_socket_data = False
+                
+                if mode == "thermometers" or mode == "all":
+                    has_thermo_data = any(t != "-" and t != "--" for t in result.get("temperatures", []))
+                
+                if mode == "socket" or mode == "all":
+                    socket_data = result.get("socket", {})
+                    has_socket_data = socket_data.get("power") not in ["--", "-", ""]
+                
+                # If we got some data locally, check what's missing
+                if mode == "all":
+                    # For "all" mode, we need both thermometers and socket
+                    # If thermometers failed but socket worked, get thermometers from cloud
+                    if has_socket_data and not has_thermo_data:
+                        log_api_call("Socket data OK locally, but thermometers failed. Getting thermometers from cloud...")
+                        cloud_result = get_temperatures()
+                        result["temperatures"] = cloud_result["temperatures"]
+                        result["humidity"] = cloud_result["humidity"]
+                        result["names"] = cloud_result["names"]
+                        result["batteries"] = cloud_result["batteries"]
+                        log_api_call("Smart mode: mixed (socket local, thermometers cloud)")
+                    elif has_thermo_data or has_socket_data:
+                        log_api_call("Local connection successful!")
+                    else:
+                        log_api_call("Local connection returned no data, falling back to cloud...")
+                        raise Exception("No local data")
+                elif mode == "thermometers":
+                    if not has_thermo_data:
+                        log_api_call("No thermometer data locally, falling back to cloud...")
+                        raise Exception("No thermometer data")
+                    else:
+                        log_api_call("Local connection successful!")
+                elif mode == "socket":
+                    if not has_socket_data:
+                        log_api_call("No socket data locally, falling back to cloud...")
+                        raise Exception("No socket data")
+                    else:
+                        log_api_call("Local connection successful!")
+                    
+            except Exception as e:
+                log_api_call(f"Local connection failed: {str(e)}, using cloud...")
+                # Fallback to cloud
+                if mode == "thermometers":
+                    result = get_temperatures()
+                elif mode == "socket":
+                    result = get_socket_data()
+                else:
+                    result = get_all_data()
+        else:
+            log_api_call("No local config, using cloud...")
+            # No local config, use cloud
+            if mode == "thermometers":
+                result = get_temperatures()
+            elif mode == "socket":
+                result = get_socket_data()
+            else:
+                result = get_all_data()
+        
+        log_api_call("=== SMART MODE: finished ===\n")
+    
+    # Local mode (hybrid: sockets local, thermometers cloud fallback)
+    elif connection_mode == "local":
+        log_api_call(f"=== LOCAL MODE: {mode} update started ===")
+        
+        if mode == "thermometers":
+            result = get_local_temperatures(config, log_api_call if LOGGING_ENABLED else None)
+            # Battery-powered thermometers sleep most of the time and are unreachable locally
+            has_data = any(t != "-" and t != "--" for t in result.get("temperatures", []))
+            if not has_data:
+                log_api_call("LOCAL: Thermometers unreachable locally (battery sleep), falling back to cloud...")
+                try:
+                    result = get_temperatures()
+                    log_api_call("LOCAL: Got thermometer data from cloud fallback")
+                except Exception as e:
+                    log_api_call(f"LOCAL: Cloud fallback also failed: {str(e)}")
+        elif mode == "socket":
+            result = get_local_socket_data(config, log_api_call if LOGGING_ENABLED else None)
+        else:
+            result = get_local_all_data(config, log_api_call if LOGGING_ENABLED else None)
+            # Check if thermometers failed (common for battery devices)
+            has_thermo_data = any(t != "-" and t != "--" for t in result.get("temperatures", []))
+            if not has_thermo_data:
+                log_api_call("LOCAL: Thermometers unreachable locally (battery sleep), falling back to cloud...")
+                try:
+                    cloud_result = get_temperatures()
+                    result["temperatures"] = cloud_result["temperatures"]
+                    result["humidity"] = cloud_result["humidity"]
+                    result["names"] = cloud_result["names"]
+                    result["batteries"] = cloud_result["batteries"]
+                    log_api_call("LOCAL: Got thermometer data from cloud fallback")
+                except Exception as e:
+                    log_api_call(f"LOCAL: Cloud fallback also failed: {str(e)}")
+        
+        log_api_call(f"=== LOCAL MODE: {mode} update finished ===\n")
+    
+    # Cloud mode (default)
     else:
-        log_api_call("=== Full update started ===")
-        result = get_all_data()
-        log_api_call("=== Full update finished ===\n")
+        log_api_call(f"=== CLOUD MODE: {mode} update started ===")
+        
+        if mode == "thermometers":
+            result = get_temperatures()
+        elif mode == "socket":
+            result = get_socket_data()
+        else:
+            result = get_all_data()
+        
+        log_api_call(f"=== CLOUD MODE: {mode} update finished ===\n")
     
     trim_log_file()
+    
+    # Save socket readings to history
+    sockets_list = result.get("sockets", [])
+    if not sockets_list and "socket" in result:
+        sockets_list = [result["socket"]]
+    if sockets_list:
+        try:
+            add_readings(sockets_list)
+        except Exception:
+            pass
     
     with open(OUTPUT_FILE, 'w') as f:
         json.dump(result, f)

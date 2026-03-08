@@ -69,6 +69,8 @@ chmod +x install.sh
 
 ## Configuration
 
+### Cloud API Mode (Default)
+
 Edit `config.json`:
 
 ```json
@@ -94,19 +96,88 @@ Edit `config.json`:
 - `devices` - Array of 3 thermometer device IDs
 - `socket` - Smart plug device ID (optional, omit if not using)
 
+### Local Network Mode
+
+For faster response and offline operation, you can connect directly to devices on your local network.
+
+**Step 1: Get Local Keys**
+
+```bash
+./venv/bin/python3 get_local_keys.py
+```
+
+This will display all your devices with their local keys and IPs.
+
+**Step 2: Add Local Configuration**
+
+Add `local_devices` and `local_socket` sections to `config.json`:
+
+```json
+{
+    "region": "eu",
+    "client_id": "YOUR_CLIENT_ID",
+    "client_secret": "YOUR_CLIENT_SECRET",
+    "device_id": "YOUR_DEVICE_ID",
+    "devices": ["DEVICE_ID_1", "DEVICE_ID_2", "DEVICE_ID_3"],
+    "local_devices": [
+        {
+            "id": "DEVICE_ID_1",
+            "name": "Living Room",
+            "ip": "192.168.1.100",
+            "local_key": "LOCAL_KEY_FROM_SCRIPT",
+            "version": "3.3"
+        },
+        {
+            "id": "DEVICE_ID_2",
+            "name": "Bedroom",
+            "ip": "192.168.1.101",
+            "local_key": "LOCAL_KEY_FROM_SCRIPT",
+            "version": "3.3"
+        },
+        {
+            "id": "DEVICE_ID_3",
+            "name": "Kitchen",
+            "ip": "192.168.1.102",
+            "local_key": "LOCAL_KEY_FROM_SCRIPT",
+            "version": "3.3"
+        }
+    ],
+    "local_socket": {
+        "id": "SOCKET_DEVICE_ID",
+        "name": "Smart Plug",
+        "ip": "192.168.1.103",
+        "local_key": "SOCKET_LOCAL_KEY",
+        "version": "3.3"
+    }
+}
+```
+
+**Step 3: Switch to Local Mode**
+
+Right-click widget → **Configure** → **Connection mode** → Select **"Local Network"**
+
+**Local Mode Benefits:**
+- ⚡ Faster response (no cloud roundtrip)
+- 🔒 Works without internet connection
+- 📉 Reduced API calls and rate limits
+- 🏠 All data stays on local network
+
 **Performance Features:**
-- Device names are cached for 24 hours to reduce API calls
+- Device names are cached for 24 hours to reduce API calls (Cloud mode)
 - Separate update intervals for thermometers and smart plug
-- Batch API requests fetch all device statuses in a single call
-- Fallback to shadow properties API for battery-powered devices
+- Batch API requests fetch all device statuses in a single call (Cloud mode)
+- Direct local communication for instant updates (Local mode)
+- Fallback to shadow properties API for battery-powered devices (Cloud mode)
 
 ## Widget Configuration
 
 Right-click on widget → **Configure** to adjust:
 
+- **Connection Mode** - Choose between Cloud API or Local Network
 - **Thermometer Update Interval** - How often to refresh thermometer data (30-600 seconds, default: 120s)
 - **Socket Update Interval** - How often to refresh smart plug data (10-300 seconds, default: 30s)
 - **Background Opacity** - Adjust widget transparency (0.0-1.0)
+- **Enable Logging** - Turn on detailed logging for troubleshooting
 
 Each section displays its last update time at the bottom.
 
@@ -168,14 +239,22 @@ tuya_termometrs/
 
 ### Manual Testing
 ```bash
-# Test data fetching (all devices)
+# Test data fetching (all devices) - Cloud mode
 ./venv/bin/python3 tuya_client.py
 
-# Test thermometers only
+# Test thermometers only - Cloud mode
 ./venv/bin/python3 tuya_client.py thermometers
 
-# Test socket only
+# Test socket only - Cloud mode
 ./venv/bin/python3 tuya_client.py socket
+
+# Test with local network mode
+./venv/bin/python3 tuya_client.py thermometers local
+./venv/bin/python3 tuya_client.py socket local
+./venv/bin/python3 tuya_client.py all local
+
+# Get local keys for devices
+./venv/bin/python3 get_local_keys.py
 
 # List all devices
 ./venv/bin/python3 list_devices.py

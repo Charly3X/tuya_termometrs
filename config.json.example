@@ -7,5 +7,35 @@
         "DEVICE_ID_1",
         "DEVICE_ID_2",
         "DEVICE_ID_3"
-    ]
+    ],
+    "local_devices": [
+        {
+            "id": "DEVICE_ID_1",
+            "name": "Sensor 1",
+            "ip": "192.168.1.100",
+            "local_key": "LOCAL_KEY_1",
+            "version": "3.3"
+        },
+        {
+            "id": "DEVICE_ID_2",
+            "name": "Sensor 2",
+            "ip": "192.168.1.101",
+            "local_key": "LOCAL_KEY_2",
+            "version": "3.3"
+        },
+        {
+            "id": "DEVICE_ID_3",
+            "name": "Sensor 3",
+            "ip": "192.168.1.102",
+            "local_key": "LOCAL_KEY_3",
+            "version": "3.3"
+        }
+    ],
+    "local_socket": {
+        "id": "SOCKET_DEVICE_ID",
+        "name": "Smart Plug",
+        "ip": "192.168.1.103",
+        "local_key": "SOCKET_LOCAL_KEY",
+        "version": "3.3"
+    }
 }

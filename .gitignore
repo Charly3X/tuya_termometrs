@@ -5,3 +5,10 @@ venv/
 __pycache__/
 .vscode/
 .idea/
+power_history.json
+api_calls.log
+token_cache.json
+device_names_cache.json
+nohup.out
+tinytuya.json
+snapshot.json
