@@ -68,16 +68,17 @@ def save_token_cache(token):
             "expire_time": datetime.fromtimestamp(expire_time).isoformat()
         }, f)
 
-def load_device_names_cache():
+def load_device_names_cache(ignore_expiry=False):
     if not CACHE_FILE.exists():
         return None
     try:
         with open(CACHE_FILE) as f:
             cache = json.load(f)
-            # Check if cache is older than 24 hours
-            cache_time = datetime.fromisoformat(cache.get("timestamp", "2000-01-01T00:00:00"))
-            if (datetime.now() - cache_time).total_seconds() > 86400:
-                return None
+            if not ignore_expiry:
+                # Check if cache is older than 24 hours
+                cache_time = datetime.fromisoformat(cache.get("timestamp", "2000-01-01T00:00:00"))
+                if (datetime.now() - cache_time).total_seconds() > 86400:
+                    return None
             return cache.get("names", {})
     except:
         return None
@@ -107,13 +108,47 @@ def get_cloud_and_device_map(config):
     device_map = load_device_names_cache()
     if device_map is None:
         log_api_call("API CALL: fetching device names")
-        # Use config devices as fallback
         device_map = {}
-        for device_id in config.get("devices", []):
-            device_map[device_id] = device_id[:8]  # Use short ID as name
+        old_cache = load_device_names_cache(ignore_expiry=True) or {}
+        has_errors = False
+        
+        # Build list of all configured devices
+        all_devices = list(config.get("devices", []))
         if "socket" in config:
-            device_map[config["socket"]] = "Socket"
-        save_device_names_cache(device_map)
+            all_devices.append(config["socket"])
+            
+        for device_id in all_devices:
+            # Check local config first just in case
+            local_name = None
+            for device_conf in config.get("local_devices", []):
+                if device_conf.get("id") == device_id:
+                    local_name = device_conf.get("name")
+            if "local_socket" in config and config["local_socket"].get("id") == device_id:
+                local_name = config["local_socket"].get("name")
+            
+            if local_name:
+                device_map[device_id] = local_name
+                continue
+                
+            # Fetch from Tuya Cloud API
+            fallback_name = old_cache.get(device_id) or ("Socket" if device_id == config.get("socket") else device_id[:8])
+            try:
+                response = cloud.cloudrequest(f'/v1.0/devices/{device_id}', action='GET')
+                if response and response.get('success'):
+                    device_map[device_id] = response.get('result', {}).get('name', fallback_name)
+                else:
+                    device_map[device_id] = fallback_name
+                    has_errors = True
+                    log_api_call(f"Failed to fetch name for {device_id}, using fallback")
+            except Exception as e:
+                device_map[device_id] = fallback_name
+                has_errors = True
+                log_api_call(f"Error fetching name for {device_id}: {str(e)}")
+                
+        if not has_errors:
+            save_device_names_cache(device_map)
+        else:
+            log_api_call("API returned errors, skipped saving cache to retry next time")
     else:
         log_api_call("Using cached device names")
     
