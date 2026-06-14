@@ -470,34 +470,28 @@ if __name__ == "__main__":
     elif connection_mode == "local":
         log_api_call(f"=== LOCAL MODE: {mode} update started ===")
         
-        if mode == "thermometers":
-            result = get_local_temperatures(config, log_api_call if LOGGING_ENABLED else None)
-            # Battery-powered thermometers sleep most of the time and are unreachable locally
-            has_data = any(t != "-" and t != "--" for t in result.get("temperatures", []))
-            if not has_data:
-                log_api_call("LOCAL: Thermometers unreachable locally (battery sleep), falling back to cloud...")
-                try:
+        try:
+            if mode == "socket" or mode == "all":
+                if mode == "socket":
+                    result = get_local_socket_data(config, log_api_call if LOGGING_ENABLED else None)
+                else: # mode == "all"
+                    result = get_local_all_data(config, log_api_call if LOGGING_ENABLED else None)
+                    # For thermostats, cloud fallback is often necessary (battery sleep)
+                    if not result or not any(t != "-" and t != "--" for t in result.get("temperatures", [])):
+                        log_api_call("LOCAL: Thermometers unreachable locally, using cloud...")
+                        cloud_res = get_temperatures()
+                        if result is None: result = {}
+                        result.update({k: cloud_res[k] for k in ["temperatures", "humidity", "names", "batteries"] if k in cloud_res})
+            
+            elif mode == "thermometers":
+                result = get_local_temperatures(config, log_api_call if LOGGING_ENABLED else None)
+                if not any(t != "-" and t != "--" for t in result.get("temperatures", [])):
+                    log_api_call("LOCAL: Thermometers unreachable locally, using cloud...")
                     result = get_temperatures()
-                    log_api_call("LOCAL: Got thermometer data from cloud fallback")
-                except Exception as e:
-                    log_api_call(f"LOCAL: Cloud fallback also failed: {str(e)}")
-        elif mode == "socket":
-            result = get_local_socket_data(config, log_api_call if LOGGING_ENABLED else None)
-        else:
-            result = get_local_all_data(config, log_api_call if LOGGING_ENABLED else None)
-            # Check if thermometers failed (common for battery devices)
-            has_thermo_data = any(t != "-" and t != "--" for t in result.get("temperatures", []))
-            if not has_thermo_data:
-                log_api_call("LOCAL: Thermometers unreachable locally (battery sleep), falling back to cloud...")
-                try:
-                    cloud_result = get_temperatures()
-                    result["temperatures"] = cloud_result["temperatures"]
-                    result["humidity"] = cloud_result["humidity"]
-                    result["names"] = cloud_result["names"]
-                    result["batteries"] = cloud_result["batteries"]
-                    log_api_call("LOCAL: Got thermometer data from cloud fallback")
-                except Exception as e:
-                    log_api_call(f"LOCAL: Cloud fallback also failed: {str(e)}")
+        except Exception as e:
+            log_api_call(f"LOCAL MODE CRITICAL ERROR: {str(e)}. Falling back to cloud only for thermometers if relevant.")
+            if mode == "thermometers": result = get_temperatures()
+            else: result = get_all_data() # Full fallback as last resort
         
         log_api_call(f"=== LOCAL MODE: {mode} update finished ===\n")
     

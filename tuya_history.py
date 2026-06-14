@@ -17,13 +17,24 @@ def load_history():
     try:
         with open(HISTORY_FILE) as f:
             return json.load(f)
-    except Exception:
+    except Exception as e:
+        # If the file is empty or corrupted, we will return {}
+        # but let's at least not do it on a half-written file anymore.
         return {}
 
 
 def save_history(history):
-    with open(HISTORY_FILE, 'w') as f:
-        json.dump(history, f)
+    temp_file = HISTORY_FILE.with_name(HISTORY_FILE.name + '.tmp')
+    try:
+        with open(temp_file, 'w') as f:
+            json.dump(history, f)
+        temp_file.rename(HISTORY_FILE)
+    except Exception:
+        if temp_file.exists():
+            try:
+                temp_file.unlink()
+            except OSError:
+                pass
 
 
 def add_readings(socket_results):

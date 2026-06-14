@@ -139,3 +139,17 @@ When an AI agent is asked to implement a change:
 - Do not change the plasmoid id (`org.kde.plasma.tuya`) unless explicitly required.
 - Avoid changes that assume a specific absolute path on the user's system.
 - Keep JSON output format consistent between cloud and local modes.
+
+## Current device configuration
+**Only 2 smart plugs are used.** Do not add more.
+- Детская (power strip) — local_sockets index 0, color green (#10b981)
+- Холодильник (refrigerator) — local_sockets index 1, color amber (#f59e0b)
+- "Чайник" and "Комп" were intentionally removed by user request.
+
+Socket layout: 1 column × 2 rows (vertical stacking via ColumnLayout).
+
+After modifying QML, copy it to the installed widget directory and restart plasmashell:
+```
+cp contents/ui/main.qml ~/.local/share/plasma/plasmoids/org.kde.plasma.tuya/contents/ui/main.qml
+killall plasmashell && sleep 2 && nohup plasmashell &
+```

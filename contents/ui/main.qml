@@ -57,8 +57,6 @@ PlasmoidItem {
     // Socket accent colors (rotating palette)
     function getSocketColors(idx) {
         var colors = [
-            {bg: "#0ea5e9", top: Qt.rgba(1,1,1,0.15), text: "#e0f2fe"},
-            {bg: "#8b5cf6", top: Qt.rgba(1,1,1,0.15), text: "#ede9fe"},
             {bg: "#10b981", top: Qt.rgba(1,1,1,0.15), text: "#d1fae5"},
             {bg: "#f59e0b", top: Qt.rgba(1,1,1,0.12), text: "#fef3c7"}
         ]
@@ -192,18 +190,15 @@ PlasmoidItem {
                 
                 // === SOCKETS (primary, left) ===
                 Item {
-                    Layout.preferredWidth: parent.width * 0.60
+                    Layout.preferredWidth: parent.width * 0.35
                     Layout.fillHeight: true
                     
-                    GridLayout {
+                    ColumnLayout {
                         anchors.fill: parent
-                        columns: 2
-                        rows: 2
-                        columnSpacing: 6
-                        rowSpacing: 6
+                        spacing: 6
                         
                         Repeater {
-                            model: Math.min(4, socketsData.length)
+                            model: Math.min(2, socketsData.length)
                             
                             Rectangle {
                                 Layout.fillWidth: true
@@ -294,7 +289,7 @@ PlasmoidItem {
                 
                 // === THERMOMETERS (secondary, right) ===
                 ColumnLayout {
-                    Layout.preferredWidth: parent.width * 0.35
+                    Layout.preferredWidth: parent.width * 0.55
                     Layout.fillHeight: true
                     spacing: 5
                     

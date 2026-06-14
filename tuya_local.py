@@ -6,48 +6,112 @@ Uses tinytuya to communicate directly with devices on the local network.
 import tinytuya
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
+import socket
+import json
+import os
+
+_IP_CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ip_cache.json')
 
 def log_local_call(message, log_func):
     """Log local network calls if logging is enabled."""
     if log_func:
         log_func(message)
 
-def get_local_device_status(device_config, log_func=None, refresh_dps=None):
+def _load_ip_cache():
+    try:
+        with open(_IP_CACHE_FILE, 'r') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def _save_ip_cache(cache):
+    try:
+        with open(_IP_CACHE_FILE, 'w') as f:
+            json.dump(cache, f, indent=2)
+    except Exception:
+        pass
+
+def discover_device_ip(device_id, log_func=None):
     """
-    Get status from a local Tuya device.
-    
-    Args:
-        device_config: dict with keys: id, ip, local_key, version
-        log_func: optional logging function
-        refresh_dps: optional list of DPS indices to force refresh before reading
-    
-    Returns:
-        dict with device status or None on error
+    Scan local network via UDP broadcast to find a Tuya device's current IP.
+    Returns new IP string or None if not found.
     """
     try:
-        log_local_call(f"LOCAL: Connecting to device {device_config['id'][:8]} at {device_config['ip']}", log_func)
-        
-        device = tinytuya.Device(
-            dev_id=device_config['id'],
-            address=device_config['ip'],
-            local_key=device_config['local_key'],
-            version=float(device_config.get('version', '3.3'))
-        )
-        
-        # Set connection timeout
-        device.set_socketTimeout(2)
-        
-        # Force refresh specific DPS before reading (e.g. power monitoring)
-        if refresh_dps:
-            device.updatedps(refresh_dps)
-        
-        # Get device status
-        status = device.status()
-        log_local_call(f"LOCAL: Response from {device_config['id'][:8]}: {status}", log_func)
-        
-        return status
+        log_local_call(f"DISCOVER: Scanning network for {device_id[:8]}...", log_func)
+        devices = tinytuya.deviceScan(verbose=False, maxretry=8, poll=False)
+        for ip, info in devices.items():
+            if info.get('gwId') == device_id:
+                log_local_call(f"DISCOVER: Found {device_id[:8]} at {ip}", log_func)
+                return ip
+        log_local_call(f"DISCOVER: Device {device_id[:8]} not found on network", log_func)
     except Exception as e:
-        log_local_call(f"LOCAL ERROR: Failed to get status from {device_config['id'][:8]}: {str(e)}", log_func)
+        log_local_call(f"DISCOVER ERROR: {str(e)}", log_func)
+    return None
+
+def _is_private_ip(ip):
+    return ip.startswith('192.168.') or ip.startswith('10.') or ip.startswith('172.')
+
+def _port_open(ip, port=6668, timeout=0.5):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(timeout)
+    result = s.connect_ex((ip, port))
+    s.close()
+    return result == 0
+
+def _connect_and_get_status(device_config, ip, log_func, refresh_dps):
+    log_local_call(f"LOCAL: Connecting to {device_config['id'][:8]} at {ip}", log_func)
+    device = tinytuya.Device(
+        dev_id=device_config['id'],
+        address=ip,
+        local_key=device_config['local_key'],
+        version=float(device_config.get('version', '3.3'))
+    )
+    device.set_socketTimeout(1.0)
+    if hasattr(device, 'set_socketRetryLimit'):
+        device.set_socketRetryLimit(1)
+    if refresh_dps:
+        device.updatedps(refresh_dps)
+    status = device.status()
+    return status if status and 'dps' in status else None
+
+def get_local_device_status(device_config, log_func=None, refresh_dps=None):
+    """
+    Get status from a local Tuya device with fast port check.
+    Falls back to network discovery if the known IP is unreachable.
+    """
+    device_id = device_config['id']
+    cache = _load_ip_cache()
+
+    # Use cached IP if available (may be newer than config)
+    ip = cache.get(device_id) or device_config.get('ip', '')
+
+    if not _is_private_ip(ip):
+        return None
+
+    try:
+        # Fast port check
+        if _port_open(ip):
+            status = _connect_and_get_status(device_config, ip, log_func, refresh_dps)
+            if status:
+                # Save working IP to cache
+                if cache.get(device_id) != ip:
+                    cache[device_id] = ip
+                    _save_ip_cache(cache)
+                return status
+        else:
+            log_local_call(f"LOCAL SKIP: Port 6668 closed on {ip}, trying discovery...", log_func)
+
+        # Discovery fallback
+        new_ip = discover_device_ip(device_id, log_func)
+        if new_ip and new_ip != ip:
+            cache[device_id] = new_ip
+            _save_ip_cache(cache)
+            if _port_open(new_ip):
+                return _connect_and_get_status(device_config, new_ip, log_func, refresh_dps)
+
+        return None
+    except Exception as e:
+        log_local_call(f"LOCAL ERROR: {str(e)}", log_func)
         return None
 
 def parse_thermometer_status(status, device_name):
