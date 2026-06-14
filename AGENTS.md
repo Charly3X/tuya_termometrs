@@ -135,6 +135,7 @@ When an AI agent is asked to implement a change:
 - DPS codes may vary by device model; check `tuya_local.py` parsing logic if values are incorrect.
 
 ## Non-goals / guardrails for agents
+- Git commit messages must always be written in English.
 - Do not add or modify user secrets.
 - Do not change the plasmoid id (`org.kde.plasma.tuya`) unless explicitly required.
 - Avoid changes that assume a specific absolute path on the user's system.
