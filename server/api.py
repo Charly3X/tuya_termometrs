@@ -9,6 +9,7 @@ including device control, so this service must never be able to act on it.
 import hmac
 import json
 import logging
+import math
 import sqlite3
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -67,23 +68,43 @@ def make_handler(conn, token):
             query = parse_qs(url.query)
             device = (query.get("device") or [""])[0]
 
-            # Untrusted network input: anything non-numeric or non-positive
-            # must not be allowed to raise inside this handler (an
-            # unhandled exception here kills the request thread and leaves
-            # the client with a bare connection drop, not an answer). An
-            # absurdly large but still numeric value is accepted as-is —
-            # it just pushes "since" far into the past, which storage.py
-            # already treats as "return everything there is".
+            # Untrusted network input: anything non-numeric, non-positive,
+            # or non-finite must not be allowed to raise inside this
+            # handler (an unhandled exception here kills the request
+            # thread and leaves the client with a bare connection drop,
+            # not an answer). float() happily parses "nan"/"inf"/
+            # "infinity", and those survive a bare "> 0" check (nan
+            # compares False against everything, +inf is > 0), so
+            # math.isfinite() is checked explicitly. A merely absurd but
+            # finite value (e.g. 1e20) is accepted as-is and just pushes
+            # "since" far into the past, which storage.py already treats
+            # as "return everything there is" — but a large enough finite
+            # value can still overflow hours * 3600 to +inf (float
+            # multiplication overflows silently in Python, it doesn't
+            # raise), so the guard checks the actual value that governs
+            # the rest of the handler — the computed "since" — and not
+            # just "hours" in isolation.
             raw_hours = (query.get("hours") or ["24"])[0]
             try:
                 hours = float(raw_hours)
-                if hours <= 0:
-                    raise ValueError("hours must be positive")
+                if not math.isfinite(hours) or hours <= 0:
+                    raise ValueError("hours must be a finite positive number")
+                since_float = time.time() - hours * 3600
+                if not math.isfinite(since_float):
+                    raise ValueError("hours is too large to compute a time bound")
             except ValueError:
                 self._send(400, {"error": "hours must be a positive number"})
                 return
 
-            since = int(time.time() - hours * 3600)
+            # A finite "since" can still be too large in magnitude for
+            # SQLite's 64-bit signed INTEGER column (storage.py binds it
+            # straight into the query), which raises OverflowError deep
+            # in storage.power_series/series. Clamping the lower bound to
+            # the Unix epoch keeps the "absurdly large hours means return
+            # everything" behaviour from before — no real reading has a
+            # timestamp earlier than 1970 — without ever handing SQLite a
+            # value it can't represent.
+            since = max(int(since_float), 0)
 
             request_conn = sqlite3.connect(db_path, timeout=30)
             try:

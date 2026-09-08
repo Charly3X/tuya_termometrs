@@ -105,6 +105,37 @@ def test_zero_hours_is_400(base_url):
     assert excinfo.value.code == 400
 
 
+@pytest.mark.parametrize("value", ["nan", "inf", "infinity", "-inf"])
+def test_non_finite_hours_is_400(base_url, value):
+    # float() happily parses all of these, and they survive a bare
+    # "> 0" check (nan compares False against everything, +inf is > 0),
+    # so they must be rejected explicitly rather than relying on
+    # whatever arithmetic happens to raise downstream.
+    with pytest.raises(urllib.error.HTTPError) as excinfo:
+        fetch(f"{base_url}/history?device=dev1&hours={value}")
+    assert excinfo.value.code == 400
+
+
+@pytest.mark.parametrize("value", ["1e20", "99999999999999999999"])
+def test_absurdly_large_but_finite_hours_still_works(base_url, value):
+    # Large enough to push "since" far below any recorded timestamp
+    # (and, before it was clamped, far below what SQLite's 64-bit
+    # INTEGER column can hold), but nowhere near overflowing
+    # hours * 3600 to +inf.
+    result = fetch(f"{base_url}/history?device=dev1&hours={value}")
+    assert result == [[1000, 90.9, 236.5], [1010, 80.0, 236.5]]
+
+
+def test_hours_large_enough_to_overflow_since_is_400(base_url):
+    # hours * 3600 overflows float64 to +inf for large enough finite
+    # input (Python float multiplication overflows silently, it doesn't
+    # raise), which would otherwise reach int() as -inf and raise
+    # OverflowError deep in the handler.
+    with pytest.raises(urllib.error.HTTPError) as excinfo:
+        fetch(f"{base_url}/history?device=dev1&hours=1e307")
+    assert excinfo.value.code == 400
+
+
 def test_absent_hours_defaults_to_24_and_returns_data(tmp_path):
     conn = storage.connect(tmp_path / "recent.db")
     now = int(time.time())
