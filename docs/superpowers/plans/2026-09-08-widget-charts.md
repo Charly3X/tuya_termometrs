@@ -266,7 +266,15 @@ git commit -m "Add chart downsampling and power summary"
 
 **Interfaces:**
 - Consumes: `chart_data.downsample`, `tuya_history.get_device_history`.
-- Produces: `history_client.get_series(settings_dict, token, device_id, hours, metrics) -> tuple[dict, str]` where the dict maps metric name to `[[ts, value], ...]` and the string is `"server"`, `"local"` or `"unavailable"`. Also `history_client.fetch_series(...)` and `history_client.local_power(device_id, hours)`, both replaceable in tests.
+- Produces: `history_client.get_series(settings_dict, token, device_id, hours, metrics) -> tuple[dict, str, dict | None]` — the series map (metric name to `[[ts, value], ...]`), the source (`"server"`, `"local"` or `"unavailable"`), and the power summary or `None`. Also `history_client.fetch_series(...)` and `history_client.local_power(device_id, hours)`, both replaceable in tests.
+
+> **The summary is computed BEFORE downsampling, and that ordering is the
+> point.** Downsampling keeps each bucket's minimum and maximum, so a plug at
+> 10% duty collapses to an alternating 0 W / 90 W series whose mean is 45 W
+> instead of 9 W. Averaging or integrating the drawn series would therefore
+> report roughly five times the real consumption. `get_series` computes the
+> summary while it still holds the raw rows, which is why it returns three
+> values rather than two.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -311,16 +319,17 @@ def local_rows(monkeypatch):
 
 
 def test_server_answer_is_used(server_url, local_rows):
-    series, source = history_client.get_series(
+    series, source, summary = history_client.get_series(
         {"history_server": server_url, "history_timeout": 3}, "tok", "dev", 1,
         ["temperature"],
     )
     assert series == {"temperature": SERVER_ROWS}
     assert source == "server"
+    assert summary is None
 
 
 def test_several_metrics_are_fetched_together(server_url, local_rows):
-    series, source = history_client.get_series(
+    series, source, _ = history_client.get_series(
         {"history_server": server_url, "history_timeout": 3}, "tok", "dev", 1,
         ["temperature", "humidity"],
     )
@@ -329,12 +338,13 @@ def test_several_metrics_are_fetched_together(server_url, local_rows):
 
 
 def test_power_falls_back_to_the_local_file(local_rows):
-    series, source = history_client.get_series(
+    series, source, summary = history_client.get_series(
         {"history_server": "http://127.0.0.1:1", "history_timeout": 1},
         "tok", "dev", 1, ["power"],
     )
     assert series == {"power": LOCAL_ROWS}
     assert source == "local"
+    assert summary is not None
 
 
 def test_temperature_has_no_local_fallback(local_rows):
@@ -342,16 +352,17 @@ def test_temperature_has_no_local_fallback(local_rows):
     The local file only ever held power and voltage. Reporting "local" here
     would promise data that does not exist.
     """
-    series, source = history_client.get_series(
+    series, source, summary = history_client.get_series(
         {"history_server": "http://127.0.0.1:1", "history_timeout": 1},
         "tok", "dev", 1, ["temperature", "humidity"],
     )
     assert series == {}
     assert source == "unavailable"
+    assert summary is None
 
 
 def test_no_server_configured_still_serves_power_locally(local_rows):
-    series, source = history_client.get_series(
+    series, source, _ = history_client.get_series(
         {"history_server": "", "history_timeout": 3}, "tok", "dev", 1, ["power"],
     )
     assert series == {"power": LOCAL_ROWS}
@@ -360,7 +371,7 @@ def test_no_server_configured_still_serves_power_locally(local_rows):
 
 def test_empty_server_answer_is_treated_as_no_data(local_rows, monkeypatch):
     monkeypatch.setattr(history_client, "fetch_series", lambda *a, **k: [])
-    series, source = history_client.get_series(
+    series, source, _ = history_client.get_series(
         {"history_server": "http://example", "history_timeout": 3},
         "tok", "dev", 1, ["power"],
     )
@@ -371,12 +382,13 @@ def test_empty_server_answer_is_treated_as_no_data(local_rows, monkeypatch):
 def test_empty_everywhere_reports_unavailable(monkeypatch):
     monkeypatch.setattr(history_client, "fetch_series", lambda *a, **k: [])
     monkeypatch.setattr(history_client, "local_power", lambda d, h: [])
-    series, source = history_client.get_series(
+    series, source, summary = history_client.get_series(
         {"history_server": "http://example", "history_timeout": 3},
         "tok", "dev", 1, ["power"],
     )
     assert series == {}
     assert source == "unavailable"
+    assert summary is None
 
 
 def test_series_are_downsampled(monkeypatch):
@@ -384,12 +396,30 @@ def test_series_are_downsampled(monkeypatch):
         history_client, "fetch_series",
         lambda *a, **k: [[i, float(i)] for i in range(12000)],
     )
-    series, source = history_client.get_series(
+    series, source, _ = history_client.get_series(
         {"history_server": "http://example", "history_timeout": 3},
         "tok", "dev", 24, ["power"],
     )
     assert source == "server"
     assert len(series["power"]) < 12000
+
+
+def test_summary_is_computed_before_downsampling(monkeypatch):
+    """
+    The reason get_series returns a summary at all instead of leaving it to
+    the caller. This series is 10% duty: 90 W for one sample in ten, 0 W
+    otherwise, so the true mean is 9 W. Downsampling keeps each bucket's min
+    and max, collapsing it to an alternating 0/90 series whose mean is 45 W.
+    Summarising the drawn data would overstate consumption fivefold.
+    """
+    raw = [[i, 90.0 if i % 10 == 0 else 0.0] for i in range(12000)]
+    monkeypatch.setattr(history_client, "fetch_series", lambda *a, **k: raw)
+    series, source, summary = history_client.get_series(
+        {"history_server": "http://example", "history_timeout": 3},
+        "tok", "dev", 24, ["power"],
+    )
+    assert len(series["power"]) < 12000       # it really was downsampled
+    assert abs(summary["avg"] - 9.0) < 0.5    # but the mean came from the raw rows
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -449,32 +479,46 @@ def fetch_series(base_url, token, device_id, hours, metric, timeout):
 
 def get_series(settings_dict, token, device_id, hours, metrics):
     """
-    (series, source) where series maps metric name to [[ts, value], ...] and
-    source is "server", "local" or "unavailable".
+    (series, source, summary).
 
-    The source is returned so the widget can say which one it drew, rather than
-    silently showing gappy local data that looks complete.
+    series maps metric name to [[ts, value], ...], already downsampled for
+    drawing. source is "server", "local" or "unavailable", and is returned so
+    the widget can say which one it drew rather than silently showing gappy
+    local data that looks complete. summary is the power statistics, or None
+    when power was not among the metrics.
+
+    The summary is computed from the RAW rows, before downsampling, and that
+    ordering is load-bearing. Downsampling keeps each bucket's minimum and
+    maximum, so a plug at 10% duty collapses to an alternating 0 W / 90 W
+    series with a mean of 45 W instead of 9 W. Summarising what gets drawn
+    would overstate consumption roughly fivefold.
     """
     base_url = settings_dict.get("history_server") or ""
     timeout = settings_dict.get("history_timeout", 3)
 
     if base_url:
         series = {}
+        summary = None
         for metric in metrics:
             rows = fetch_series(base_url, token, device_id, hours, metric, timeout)
             if rows:
+                if metric == "power":
+                    summary = chart_data.summarise_power(rows)
                 series[metric] = chart_data.downsample(rows)
         if series:
-            return series, "server"
+            return series, "server", summary
 
     # Either no server, or it had nothing for any requested metric.
-    local = [metric for metric in metrics if metric in LOCAL_METRICS]
-    if local:
+    if any(metric in LOCAL_METRICS for metric in metrics):
         rows = local_power(device_id, hours)
         if rows:
-            return {"power": chart_data.downsample(rows)}, "local"
+            return (
+                {"power": chart_data.downsample(rows)},
+                "local",
+                chart_data.summarise_power(rows),
+            )
 
-    return {}, "unavailable"
+    return {}, "unavailable", None
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -514,13 +558,12 @@ In `tuya_client.py`, replace the whole `if mode == "history":` block with:
         metrics = (args[3] if len(args) > 3 else "power").split(",")
         app_settings = load_settings()
         token = (load_config() or {}).get("history_token", "")
-        series, source = history_client.get_series(
+        # The summary comes back from get_series rather than being computed
+        # here, because it has to be taken from the raw rows: the series in
+        # hand is already downsampled, and averaging min/max pairs would
+        # overstate consumption several-fold.
+        series, source, summary = history_client.get_series(
             app_settings, token, device_id, hours, metrics
-        )
-        # The summary only means anything for a power curve.
-        summary = (
-            chart_data.summarise_power(series["power"])
-            if "power" in series else None
         )
         print(json.dumps({
             "series": series,
@@ -555,14 +598,14 @@ Run:
 ```bash
 ./venv/bin/python3 -c "
 import json, history_client
-series, source = history_client.get_series(
+series, source, summary = history_client.get_series(
     {'history_server': 'http://127.0.0.1:1', 'history_timeout': 1},
     'tok', 'bfac5ed45637af7f13fzwd', 6, ['temperature', 'humidity'])
-print(source, series)
+print(source, series, summary)
 "
 ```
 
-Expected: `unavailable {}`
+Expected: `unavailable {} None`
 
 - [ ] **Step 4: Commit**
 
