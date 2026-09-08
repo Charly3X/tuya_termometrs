@@ -20,6 +20,18 @@ log = logging.getLogger("api")
 
 
 def make_handler(conn, token):
+    # A falsy token (empty string, None) would make compare_digest("", "")
+    # true for a bare "Authorization: Bearer " header, authenticating
+    # anyone. A config file with an empty history_token is a plausible
+    # accident (unfilled placeholder, bad edit, truncated deploy), so this
+    # must fail closed at startup rather than silently accept everyone.
+    if not token:
+        raise ValueError(
+            "api.make_handler: token is empty. Set a non-empty "
+            "history_token in config.json — refusing to start a server "
+            "that would authenticate any request."
+        )
+
     # ThreadingHTTPServer answers each request on its own thread, but the
     # sqlite3 connection we're handed was opened on the thread that called
     # storage.connect() and refuses to be touched from any other thread
@@ -54,10 +66,26 @@ def make_handler(conn, token):
             url = urlparse(self.path)
             query = parse_qs(url.query)
             device = (query.get("device") or [""])[0]
-            hours = int((query.get("hours") or ["24"])[0])
-            since = int(time.time()) - hours * 3600
 
-            request_conn = sqlite3.connect(db_path)
+            # Untrusted network input: anything non-numeric or non-positive
+            # must not be allowed to raise inside this handler (an
+            # unhandled exception here kills the request thread and leaves
+            # the client with a bare connection drop, not an answer). An
+            # absurdly large but still numeric value is accepted as-is —
+            # it just pushes "since" far into the past, which storage.py
+            # already treats as "return everything there is".
+            raw_hours = (query.get("hours") or ["24"])[0]
+            try:
+                hours = float(raw_hours)
+                if hours <= 0:
+                    raise ValueError("hours must be positive")
+            except ValueError:
+                self._send(400, {"error": "hours must be a positive number"})
+                return
+
+            since = int(time.time() - hours * 3600)
+
+            request_conn = sqlite3.connect(db_path, timeout=30)
             try:
                 if url.path == "/history":
                     self._send(200, storage.power_series(request_conn, device, since))

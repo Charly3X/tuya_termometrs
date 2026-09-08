@@ -1,5 +1,6 @@
 import json
 import threading
+import time
 import urllib.error
 import urllib.request
 from http.server import ThreadingHTTPServer
@@ -77,3 +78,44 @@ def test_there_is_no_write_endpoint(base_url):
     with pytest.raises(urllib.error.HTTPError) as excinfo:
         urllib.request.urlopen(request, timeout=5)
     assert excinfo.value.code == 501
+
+
+def test_empty_token_refuses_to_start(tmp_path):
+    # An empty history_token in config.json would make
+    # compare_digest("", "") true for a bare "Authorization: Bearer "
+    # header, authenticating anyone. The service must fail closed at
+    # construction time rather than accept that per request.
+    conn = storage.connect(tmp_path / "t.db")
+    try:
+        with pytest.raises(ValueError):
+            api.make_handler(conn, "")
+    finally:
+        conn.close()
+
+
+def test_non_numeric_hours_is_400(base_url):
+    with pytest.raises(urllib.error.HTTPError) as excinfo:
+        fetch(f"{base_url}/history?device=dev1&hours=abc")
+    assert excinfo.value.code == 400
+
+
+def test_zero_hours_is_400(base_url):
+    with pytest.raises(urllib.error.HTTPError) as excinfo:
+        fetch(f"{base_url}/history?device=dev1&hours=0")
+    assert excinfo.value.code == 400
+
+
+def test_absent_hours_defaults_to_24_and_returns_data(tmp_path):
+    conn = storage.connect(tmp_path / "recent.db")
+    now = int(time.time())
+    storage.write(conn, now - 60, "dev1", {"power": 42.0, "voltage": 230.0})
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), api.make_handler(conn, TOKEN))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        result = fetch(f"http://127.0.0.1:{server.server_port}/history?device=dev1")
+        assert result == [[now - 60, 42.0, 230.0]]
+    finally:
+        server.shutdown()
+        conn.close()
