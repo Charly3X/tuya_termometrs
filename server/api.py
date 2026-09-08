@@ -144,6 +144,9 @@ if __name__ == "__main__":
     config = _json.loads((Path(__file__).parent.parent / "config.json").read_text())
     serve(
         storage.connect(app_settings["server"]["database"]),
-        config["history_token"],
+        # .get, not [], so a config.json without the key reaches
+        # make_handler's guard and the operator sees its explanation
+        # instead of a bare KeyError traceback under systemd.
+        config.get("history_token", ""),
         app_settings["server"]["port"],
     )

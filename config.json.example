@@ -35,11 +35,24 @@
             "cloud_only": true
         }
     ],
-    "local_socket": {
-        "id": "SOCKET_DEVICE_ID",
-        "name": "Smart Plug",
-        "ip": "192.168.1.103",
-        "local_key": "SOCKET_LOCAL_KEY",
-        "version": "3.3"
-    }
+    "_comment_local_sockets": "Plural. The collector and the widget both read local_sockets; a lone local_socket object is only still honoured as a legacy fallback by the widget, and the collector ignores it entirely.",
+    "local_sockets": [
+        {
+            "id": "SOCKET_DEVICE_ID_1",
+            "name": "Smart Plug 1",
+            "ip": "192.168.1.103",
+            "local_key": "SOCKET_LOCAL_KEY_1",
+            "version": "3.3"
+        },
+        {
+            "id": "SOCKET_DEVICE_ID_2",
+            "name": "Smart Plug 2",
+            "ip": "192.168.1.104",
+            "local_key": "SOCKET_LOCAL_KEY_2",
+            "version": "3.3"
+        }
+    ],
+
+    "_comment_history_token": "Shared secret for the history API. Generate with: ./venv/bin/python3 -c \"import secrets; print(secrets.token_urlsafe(32))\" and put the SAME value here on the server and on the desktop. Never commit a real one.",
+    "history_token": "GENERATE_A_TOKEN"
 }
