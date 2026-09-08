@@ -94,7 +94,8 @@ The widget UI is implemented in QML and periodically calls a local Python script
 - **DO NOT commit** `config.json`.
 - `config.json` contains:
   - Cloud mode: `region`, `client_id`, `client_secret`, `device_id`, `devices`, optional `socket`
-  - Local mode: `local_devices` array (id, name, ip, local_key, version), optional `local_socket` object
+  - Local mode: `local_devices` array (id, name, ip, local_key, version, optional
+    `cloud_only`), optional `local_socket` object
 
 Files created/used at runtime in the repo directory:
 - `sharing_token.json` (Smart Life backend; contains access/refresh tokens, mode 600)
@@ -150,6 +151,11 @@ When an AI agent is asked to implement a change:
   and only push to the cloud: they do not answer on port 6668 and do not respond to
   `tinytuya.deviceScan` broadcasts. Any "make the sensors work locally" request is
   impossible with this hardware — only the smart plugs are locally reachable.
+  They are therefore marked `"cloud_only": true` in `config.json`, which makes
+  `get_local_device_status()` return immediately instead of spending ~8s on a
+  discovery scan per device. Do not remove the flag: without it a thermometer
+  refresh costs 25s instead of 0.6s. The flag is per device — leave it off for the
+  sockets, where discovery genuinely recovers a device after a DHCP address change.
 - **Do not remove `prefer_ipv4()` from `tuya_sharing_api.py`.** `apigw.tuyaeu.com`
   publishes AAAA records that are black-holed on this connection. urllib3 tries the
   resolved addresses sequentially with the SDK's 60s timeout, so every cloud request

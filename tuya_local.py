@@ -80,6 +80,14 @@ def get_local_device_status(device_config, log_func=None, refresh_dps=None):
     Falls back to network discovery if the known IP is unreachable.
     """
     device_id = device_config['id']
+
+    # Battery-powered sensors sleep and only push to the cloud: they never
+    # listen on port 6668 and never answer a discovery broadcast. Probing them
+    # costs a full network scan per device and can only ever fail.
+    if device_config.get('cloud_only'):
+        log_local_call(f"LOCAL SKIP: {device_id[:8]} is cloud-only", log_func)
+        return None
+
     cache = _load_ip_cache()
 
     # Use cached IP if available (may be newer than config)

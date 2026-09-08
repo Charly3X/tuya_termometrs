@@ -14,21 +14,25 @@
             "name": "Sensor 1",
             "ip": "192.168.1.100",
             "local_key": "LOCAL_KEY_1",
-            "version": "3.3"
+            "version": "3.3",
+            "_comment": "Set cloud_only for battery sensors that sleep: they never answer locally, so probing them wastes a full network scan per update.",
+            "cloud_only": true
         },
         {
             "id": "DEVICE_ID_2",
             "name": "Sensor 2",
             "ip": "192.168.1.101",
             "local_key": "LOCAL_KEY_2",
-            "version": "3.3"
+            "version": "3.3",
+            "cloud_only": true
         },
         {
             "id": "DEVICE_ID_3",
             "name": "Sensor 3",
             "ip": "192.168.1.102",
             "local_key": "LOCAL_KEY_3",
-            "version": "3.3"
+            "version": "3.3",
+            "cloud_only": true
         }
     ],
     "local_socket": {
