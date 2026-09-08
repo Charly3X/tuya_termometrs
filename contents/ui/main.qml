@@ -27,7 +27,12 @@ PlasmoidItem {
     property int chartPeriod: 1
     property bool chartVisible: false
     property string chartSource: "server"
-    
+    // The window the chart's time axis spans, in epoch seconds. Derived from
+    // the selected period rather than from the samples, so "24ч" looks like
+    // 24 hours even when the sensor only changed value twice.
+    property real chartWindowStart: 0
+    property real chartWindowEnd: 0
+
     preferredRepresentation: fullRepresentation
     
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
@@ -52,6 +57,14 @@ PlasmoidItem {
         return Qt.rgba(0.9, 0.3, 0.2, 0.08)
     }
     
+    // Legend values: one decimal only when it carries information, so the
+    // humidity reads "45%" while the power reads "91.8 Вт".
+    function formatValue(v) {
+        if (v === undefined || v === null || isNaN(v)) return "-"
+        return Math.abs(v - Math.round(v)) < 0.05
+               ? String(Math.round(v)) : v.toFixed(1)
+    }
+
     function getBatteryColor(level) {
         if (level < 20) return "#ef4444"
         if (level < 40) return "#f97316"
@@ -98,17 +111,23 @@ PlasmoidItem {
                             chartSource = result.source || "server"
                             chartSummary = result.summary || null
                             var built = []
+                            // Units are spelled the same here, on the axis,
+                            // in the legend and in the summary row: one panel
+                            // saying "W" in one place and "Вт" in another
+                            // reads as two different quantities.
                             if (chartKind === "socket") {
                                 built.push({points: result.series.power || [],
-                                            color: "#10b981", unit: "W",
-                                            axis: "left", label: "Мощность"})
+                                            color: "#10b981", unit: " Вт",
+                                            axis: "left", label: "Мощность",
+                                            floorAtZero: true})
                             } else {
                                 built.push({points: result.series.temperature || [],
-                                            color: "#fbbf24", unit: "°",
+                                            color: "#fbbf24", unit: "°C",
                                             axis: "left", label: "Температура"})
                                 built.push({points: result.series.humidity || [],
                                             color: "#38bdf8", unit: "%",
-                                            axis: "right", label: "Влажность"})
+                                            axis: "right", label: "Влажность",
+                                            floorAtZero: true})
                             }
                             chartSeries = built
                         }
@@ -140,10 +159,17 @@ PlasmoidItem {
     }
     
     function loadChartData() {
+        // The axis shows the period that was asked for, whatever comes back.
+        var nowSec = Math.floor(Date.now() / 1000)
+        chartWindowEnd = nowSec
+        chartWindowStart = nowSec - chartPeriod * 3600
+
         if (!chartDeviceId) {
             chartSeries = []
             chartSummary = null
-            chartSource = "unavailable"
+            // No request went out, so nothing is known about the server:
+            // "нет данных" rather than "сервер недоступен".
+            chartSource = "empty"
             return
         }
         var metrics = chartKind === "socket" ? "power" : "temperature,humidity"
@@ -288,6 +314,8 @@ PlasmoidItem {
                                         root.chartDeviceId = socketsData[index].id
                                         root.chartDeviceName = socketsData[index].name
                                         root.chartKind = "socket"
+                                        // A plug reports every few seconds,
+                                        // so an hour is already a full curve.
                                         root.chartPeriod = 1
                                         root.chartSeries = []
                                         root.chartSummary = null
@@ -462,7 +490,12 @@ PlasmoidItem {
                                     root.chartDeviceId = root.deviceIds[index] || ""
                                     root.chartDeviceName = deviceNames[index]
                                     root.chartKind = "sensor"
-                                    root.chartPeriod = 1
+                                    // A sensor reading is recorded only when
+                                    // it changes, which is roughly hourly, so
+                                    // a one-hour window holds a single sample
+                                    // and opens on a lone dot. 24 hours is
+                                    // the shortest period that shows a curve.
+                                    root.chartPeriod = 24
                                     root.chartSeries = []
                                     root.chartSummary = null
                                     root.chartSource = "server"
@@ -495,148 +528,192 @@ PlasmoidItem {
                         }
                     }
                 }
+            }
+
+            // === CHART OVERLAY ===
+            Rectangle {
+                id: chartOverlay
+                visible: chartVisible
+                anchors.fill: parent
+                z: 100
+                color: Qt.rgba(0.03, 0.04, 0.08, 0.97)
+                radius: 19
                 
-                // === CHART OVERLAY ===
-                Rectangle {
-                    id: chartOverlay
-                    visible: chartVisible
+                // Close on click outside chart
+                MouseArea {
                     anchors.fill: parent
-                    z: 100
-                    color: Qt.rgba(0.03, 0.04, 0.08, 0.97)
-                    radius: 19
+                    onClicked: chartVisible = false
+                }
+                
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 16
+                    spacing: 10
                     
-                    // Close on click outside chart
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: chartVisible = false
+                    // Header
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+                        
+                        PlasmaComponents.Label {
+                            text: chartDeviceName
+                            font.pixelSize: 16
+                            font.weight: Font.Bold
+                            color: "white"
+                            Layout.fillWidth: true
+                        }
+
+                        // Legend: one entry per drawn series, in that
+                        // series' colour, with its latest value. Replaces
+                        // a hardcoded "⚡" that also sat above the
+                        // temperature charts, and tells the two-line
+                        // sensor chart which line is which.
+                        RowLayout {
+                            spacing: 10
+
+                            Repeater {
+                                model: root.chartSeries
+
+                                RowLayout {
+                                    spacing: 4
+                                    // A sensor always contributes both series;
+                                    // the one the server has no rows for gets
+                                    // no legend entry.
+                                    visible: modelData && modelData.points
+                                             && modelData.points.length > 0
+
+                                    Rectangle {
+                                        Layout.preferredWidth: 8
+                                        Layout.preferredHeight: 8
+                                        radius: 4
+                                        color: modelData ? modelData.color : "transparent"
+                                    }
+
+                                    PlasmaComponents.Label {
+                                        text: (modelData && modelData.points && modelData.points.length)
+                                              ? modelData.label + " "
+                                                + root.formatValue(modelData.points[modelData.points.length - 1][1])
+                                                + modelData.unit
+                                              : ""
+                                        font.pixelSize: 10
+                                        color: modelData ? modelData.color : "transparent"
+                                    }
+                                }
+                            }
+                        }
+
+                        // Close button
+                        Rectangle {
+                            width: 24
+                            height: 24
+                            radius: 12
+                            color: Qt.rgba(1, 1, 1, 0.1)
+                            
+                            PlasmaComponents.Label {
+                                anchors.centerIn: parent
+                                text: "✕"
+                                font.pixelSize: 12
+                                color: Qt.rgba(1, 1, 1, 0.6)
+                            }
+                            
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: chartVisible = false
+                            }
+                        }
                     }
                     
-                    ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: 16
-                        spacing: 10
+                    PlasmaComponents.Label {
+                        Layout.alignment: Qt.AlignHCenter
+                        visible: chartSource === "local"
+                        text: "локальные данные, сервер недоступен"
+                        font.pixelSize: 10
+                        color: "#fbbf24"
+                    }
+
+                    // Period selector
+                    RowLayout {
+                        Layout.alignment: Qt.AlignHCenter
+                        spacing: 4
                         
-                        // Header
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 8
+                        Repeater {
+                            model: [{label: "1ч", hours: 1}, {label: "6ч", hours: 6}, {label: "24ч", hours: 24}]
                             
-                            PlasmaComponents.Label {
-                                text: "⚡"
-                                font.pixelSize: 18
-                            }
-                            
-                            PlasmaComponents.Label {
-                                text: chartDeviceName
-                                font.pixelSize: 16
-                                font.weight: Font.Bold
-                                color: "white"
-                                Layout.fillWidth: true
-                            }
-                            
-                            // Close button
                             Rectangle {
-                                width: 24
-                                height: 24
-                                radius: 12
-                                color: Qt.rgba(1, 1, 1, 0.1)
+                                width: 50
+                                height: 26
+                                radius: 13
+                                color: chartPeriod === modelData.hours ? "#6366f1" : Qt.rgba(1, 1, 1, 0.08)
                                 
                                 PlasmaComponents.Label {
                                     anchors.centerIn: parent
-                                    text: "✕"
-                                    font.pixelSize: 12
-                                    color: Qt.rgba(1, 1, 1, 0.6)
+                                    text: modelData.label
+                                    font.pixelSize: 11
+                                    font.weight: chartPeriod === modelData.hours ? Font.Bold : Font.Normal
+                                    color: chartPeriod === modelData.hours ? "white" : Qt.rgba(1, 1, 1, 0.5)
                                 }
                                 
                                 MouseArea {
                                     anchors.fill: parent
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: chartVisible = false
-                                }
-                            }
-                        }
-                        
-                        PlasmaComponents.Label {
-                            Layout.alignment: Qt.AlignHCenter
-                            visible: chartSource === "local"
-                            text: "локальные данные, сервер недоступен"
-                            font.pixelSize: 10
-                            color: "#fbbf24"
-                        }
-
-                        // Period selector
-                        RowLayout {
-                            Layout.alignment: Qt.AlignHCenter
-                            spacing: 4
-                            
-                            Repeater {
-                                model: [{label: "1ч", hours: 1}, {label: "6ч", hours: 6}, {label: "24ч", hours: 24}]
-                                
-                                Rectangle {
-                                    width: 50
-                                    height: 26
-                                    radius: 13
-                                    color: chartPeriod === modelData.hours ? "#6366f1" : Qt.rgba(1, 1, 1, 0.08)
-                                    
-                                    PlasmaComponents.Label {
-                                        anchors.centerIn: parent
-                                        text: modelData.label
-                                        font.pixelSize: 11
-                                        font.weight: chartPeriod === modelData.hours ? Font.Bold : Font.Normal
-                                        color: chartPeriod === modelData.hours ? "white" : Qt.rgba(1, 1, 1, 0.5)
-                                    }
-                                    
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            chartPeriod = modelData.hours
-                                            chartSeries = []
-                                            chartSummary = null
-                                            chartCanvas.repaint()
-                                            loadChartData()
-                                        }
+                                    onClicked: {
+                                        chartPeriod = modelData.hours
+                                        chartSeries = []
+                                        chartSummary = null
+                                        // Otherwise the amber "локальные
+                                        // данные" banner from the last
+                                        // period hangs over the empty
+                                        // canvas until the answer lands.
+                                        chartSource = "server"
+                                        chartCanvas.repaint()
+                                        loadChartData()
                                     }
                                 }
                             }
                         }
-                        
-                        ChartCanvas {
-                            id: chartCanvas
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            series: root.chartSeries
-                            emptyText: root.chartSource === "unavailable"
-                                       ? "Сервер недоступен" : "Нет данных"
-                        }
+                    }
+                    
+                    ChartCanvas {
+                        id: chartCanvas
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        series: root.chartSeries
+                        windowStart: root.chartWindowStart
+                        windowEnd: root.chartWindowEnd
+                        // "unavailable" is the one case where the server
+                        // is actually at fault; "empty" means it answered
+                        // and simply has nothing for this device.
+                        emptyText: root.chartSource === "unavailable"
+                                   ? "Сервер недоступен" : "Нет данных"
+                    }
 
-                        RowLayout {
-                            Layout.fillWidth: true
-                            visible: root.chartKind === "socket" && root.chartSummary !== null
-                            spacing: 0
+                    RowLayout {
+                        Layout.fillWidth: true
+                        visible: root.chartKind === "socket" && root.chartSummary !== null
+                        spacing: 0
 
-                            Repeater {
-                                model: root.chartSummary ? [
-                                    {k: "мин", v: root.chartSummary.min.toFixed(0) + " Вт"},
-                                    {k: "сред", v: root.chartSummary.avg.toFixed(0) + " Вт"},
-                                    {k: "макс", v: root.chartSummary.max.toFixed(0) + " Вт"},
-                                    {k: "расход", v: root.chartSummary.kwh.toFixed(2) + " кВт·ч"}
-                                ] : []
+                        Repeater {
+                            model: root.chartSummary ? [
+                                {k: "мин", v: root.chartSummary.min.toFixed(0) + " Вт"},
+                                {k: "сред", v: root.chartSummary.avg.toFixed(0) + " Вт"},
+                                {k: "макс", v: root.chartSummary.max.toFixed(0) + " Вт"},
+                                {k: "расход", v: root.chartSummary.kwh.toFixed(2) + " кВт·ч"}
+                            ] : []
 
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 4
-                                    PlasmaComponents.Label {
-                                        text: modelData.k
-                                        font.pixelSize: 10
-                                        color: Qt.rgba(1, 1, 1, 0.45)
-                                    }
-                                    PlasmaComponents.Label {
-                                        text: modelData.v
-                                        font.pixelSize: 10
-                                        font.bold: true
-                                        color: "#e8eaf0"
-                                    }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 4
+                                PlasmaComponents.Label {
+                                    text: modelData.k
+                                    font.pixelSize: 10
+                                    color: Qt.rgba(1, 1, 1, 0.45)
+                                }
+                                PlasmaComponents.Label {
+                                    text: modelData.v
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                    color: "#e8eaf0"
                                 }
                             }
                         }
