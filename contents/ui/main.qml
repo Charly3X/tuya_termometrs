@@ -615,292 +615,37 @@ PlasmoidItem {
                 }
             }
 
-            // === CHART OVERLAY ===
-            Rectangle {
-                id: chartOverlay
-                visible: chartVisible
-                anchors.fill: parent
-                z: 100
-                color: Qt.rgba(0.03, 0.04, 0.08, 0.97)
-                radius: 19
-                
-                // Close on click outside chart
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: chartVisible = false
+            // === CHART WINDOW ===
+            // A separate, resizable window rather than an in-widget overlay
+            // -- the widget itself is only ~700x200 in the chart area, not
+            // enough to read a day of readings on. `visible` is bound one
+            // way from chartVisible and never assigned to from inside
+            // ChartWindow (see its onClosing), so the binding survives
+            // repeated open/close cycles.
+            ChartWindow {
+                id: chartWindow
+                visible: root.chartVisible
+                deviceName: root.chartDeviceName
+                kind: root.chartKind
+                seriesData: root.chartSeries
+                summaries: root.chartSummaries
+                period: root.chartPeriod
+                source: root.chartSource
+                windowStart: root.chartWindowStart
+                windowEnd: root.chartWindowEnd
+
+                onPeriodRequested: (hours) => {
+                    root.chartPeriod = hours
+                    root.chartSeries = []
+                    root.chartSummaries = {}
+                    // Otherwise the amber "локальные данные" banner from
+                    // the last period hangs over the empty canvas until
+                    // the answer lands.
+                    root.chartSource = "server"
+                    root.loadChartData()
                 }
-                
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: 16
-                    spacing: 10
-                    
-                    // Header
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
-                        
-                        PlasmaComponents.Label {
-                            text: chartDeviceName
-                            font.pixelSize: 16
-                            font.weight: Font.Bold
-                            color: "white"
-                            Layout.fillWidth: true
-                        }
 
-                        // Legend: one entry per drawn series, in that
-                        // series' colour, with its latest value. Replaces
-                        // a hardcoded "⚡" that also sat above the
-                        // temperature charts, and tells the two-line
-                        // sensor chart which line is which.
-                        RowLayout {
-                            spacing: 10
-
-                            Repeater {
-                                model: root.chartSeries
-
-                                RowLayout {
-                                    spacing: 4
-                                    // A sensor always contributes both series;
-                                    // the one the server has no rows for gets
-                                    // no legend entry.
-                                    visible: modelData && modelData.points
-                                             && modelData.points.length > 0
-
-                                    Rectangle {
-                                        Layout.preferredWidth: 8
-                                        Layout.preferredHeight: 8
-                                        radius: 4
-                                        color: modelData ? modelData.color : "transparent"
-                                    }
-
-                                    PlasmaComponents.Label {
-                                        text: (modelData && modelData.points && modelData.points.length)
-                                              ? modelData.label + " "
-                                                + root.formatValue(modelData.points[modelData.points.length - 1][1])
-                                                + modelData.unit
-                                              : ""
-                                        font.pixelSize: 10
-                                        color: modelData ? modelData.color : "transparent"
-                                    }
-                                }
-                            }
-                        }
-
-                        // Close button
-                        Rectangle {
-                            width: 24
-                            height: 24
-                            radius: 12
-                            color: Qt.rgba(1, 1, 1, 0.1)
-                            
-                            PlasmaComponents.Label {
-                                anchors.centerIn: parent
-                                text: "✕"
-                                font.pixelSize: 12
-                                color: Qt.rgba(1, 1, 1, 0.6)
-                            }
-                            
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: chartVisible = false
-                            }
-                        }
-                    }
-                    
-                    PlasmaComponents.Label {
-                        Layout.alignment: Qt.AlignHCenter
-                        visible: chartSource === "local"
-                        // Just the fact, not a reason. This banner cannot tell
-                        // an unreachable server from a live one that simply has
-                        // no rows for this device yet, and claiming the former
-                        // when it is the latter sends someone debugging a
-                        // server that is working fine.
-                        text: "локальные данные"
-                        font.pixelSize: 10
-                        color: "#fbbf24"
-                    }
-
-                    // Period selector
-                    RowLayout {
-                        Layout.alignment: Qt.AlignHCenter
-                        spacing: 4
-                        
-                        Repeater {
-                            model: [{label: "1ч", hours: 1}, {label: "6ч", hours: 6}, {label: "24ч", hours: 24}]
-                            
-                            Rectangle {
-                                width: 50
-                                height: 26
-                                radius: 13
-                                color: chartPeriod === modelData.hours ? "#6366f1" : Qt.rgba(1, 1, 1, 0.08)
-                                
-                                PlasmaComponents.Label {
-                                    anchors.centerIn: parent
-                                    text: modelData.label
-                                    font.pixelSize: 11
-                                    font.weight: chartPeriod === modelData.hours ? Font.Bold : Font.Normal
-                                    color: chartPeriod === modelData.hours ? "white" : Qt.rgba(1, 1, 1, 0.5)
-                                }
-                                
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        chartPeriod = modelData.hours
-                                        chartSeries = []
-                                        chartSummaries = {}
-                                        // Otherwise the amber "локальные
-                                        // данные" banner from the last
-                                        // period hangs over the empty
-                                        // canvas until the answer lands.
-                                        chartSource = "server"
-                                        chartCanvas.repaint()
-                                        loadChartData()
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    ChartCanvas {
-                        id: chartCanvas
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        series: root.chartSeries
-                        windowStart: root.chartWindowStart
-                        windowEnd: root.chartWindowEnd
-                        // "unavailable" is the one case where the server
-                        // is actually at fault; "empty" means it answered
-                        // and simply has nothing for this device.
-                        emptyText: root.chartSource === "unavailable"
-                                   ? "Сервер недоступен" : "Нет данных"
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Layout.topMargin: 8
-                        Layout.bottomMargin: 2
-                        visible: root.chartKind === "socket" && root.chartSummaries.power !== undefined
-                        spacing: 10
-
-                        Repeater {
-                            model: root.chartSummaries.power ? [
-                                {k: "мин", v: root.chartSummaries.power.min.toFixed(0) + " Вт", c: "#e8eaf0"},
-                                {k: "сред", v: root.chartSummaries.power.avg.toFixed(0) + " Вт", c: "#e8eaf0"},
-                                {k: "макс", v: root.chartSummaries.power.max.toFixed(0) + " Вт", c: "#e8eaf0"},
-                                {k: "расход", v: root.chartSummaries.power.kwh.toFixed(2) + " кВт·ч", c: "#e8eaf0"}
-                            ] : []
-
-                            // Each cell is an Item that fills its share of the row
-                            // with the pair centred inside it. The previous version
-                            // put Layout.fillWidth on the pair's own RowLayout, so
-                            // the two labels packed against the left edge and every
-                            // value ran straight into the next label: "0 Втсред".
-                            Item {
-                                Layout.fillWidth: true
-                                implicitHeight: cell.implicitHeight
-
-                                Row {
-                                    id: cell
-                                    anchors.centerIn: parent
-                                    spacing: 5
-
-                                    PlasmaComponents.Label {
-                                        text: modelData.k
-                                        font.pixelSize: 10
-                                        color: Qt.rgba(1, 1, 1, 0.45)
-                                    }
-                                    PlasmaComponents.Label {
-                                        text: modelData.v
-                                        font.pixelSize: 10
-                                        font.bold: true
-                                        color: modelData.c
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Sensor summary: min/avg/max for temperature and for
-                    // humidity, one row per metric that actually has data,
-                    // each labelled and coloured to match its series (same
-                    // colours as the chart legend/axis above). kwh is never
-                    // shown here -- it is null by design for both metrics,
-                    // integrating a temperature or a humidity curve is
-                    // meaningless.
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        Layout.topMargin: 8
-                        Layout.bottomMargin: 2
-                        visible: root.chartKind === "sensor"
-                                 && (root.chartSummaries.temperature !== undefined
-                                     || root.chartSummaries.humidity !== undefined)
-                        spacing: 4
-
-                        Repeater {
-                            model: {
-                                var groups = []
-                                if (root.chartSummaries.temperature !== undefined) {
-                                    var t = root.chartSummaries.temperature
-                                    groups.push([
-                                        {k: "мин", v: t.min.toFixed(1) + "°C", c: "#fbbf24"},
-                                        {k: "сред", v: t.avg.toFixed(1) + "°C", c: "#fbbf24"},
-                                        {k: "макс", v: t.max.toFixed(1) + "°C", c: "#fbbf24"}
-                                    ])
-                                }
-                                if (root.chartSummaries.humidity !== undefined) {
-                                    var h = root.chartSummaries.humidity
-                                    groups.push([
-                                        {k: "мин", v: h.min.toFixed(0) + "%", c: "#38bdf8"},
-                                        {k: "сред", v: h.avg.toFixed(0) + "%", c: "#38bdf8"},
-                                        {k: "макс", v: h.max.toFixed(0) + "%", c: "#38bdf8"}
-                                    ])
-                                }
-                                return groups
-                            }
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 10
-
-                                Repeater {
-                                    model: modelData
-
-                                    // Same layout approach as the socket summary
-                                    // row above: an Item with Layout.fillWidth
-                                    // and the label/value pair centred inside it,
-                                    // not fillWidth on the pair itself -- that
-                                    // packs the labels left and runs values into
-                                    // the next label.
-                                    Item {
-                                        Layout.fillWidth: true
-                                        implicitHeight: sensorCell.implicitHeight
-
-                                        Row {
-                                            id: sensorCell
-                                            anchors.centerIn: parent
-                                            spacing: 5
-
-                                            PlasmaComponents.Label {
-                                                text: modelData.k
-                                                font.pixelSize: 10
-                                                color: Qt.rgba(1, 1, 1, 0.45)
-                                            }
-                                            PlasmaComponents.Label {
-                                                text: modelData.v
-                                                font.pixelSize: 10
-                                                font.bold: true
-                                                color: modelData.c
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                onCloseRequested: root.chartVisible = false
             }
         }
     }
