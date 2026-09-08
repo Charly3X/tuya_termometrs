@@ -61,17 +61,22 @@ def test_summary_of_a_constant_hour():
 
 
 def test_summary_integrates_a_changing_load():
-    """Trapezoid: 0 W to 100 W over an hour averages 50 W, so 0.05 kWh."""
-    points = [[0, 0.0], [3600, 100.0]]
-    assert abs(chart_data.summarise_power(points)["kwh"] - 0.05) < 1e-9
+    """A ramp from 0 W to 100 W over an hour averages 50 W, so 0.05 kWh."""
+    points = [[t, 100.0 * t / 3600] for t in range(0, 3601, 60)]
+    result = chart_data.summarise_power(points)
+    assert abs(result["kwh"] - 0.05) < 1e-9
+    assert result["min"] == 0.0
+    assert result["max"] == 100.0
 
 
 def test_summary_skips_a_long_gap():
     """
     A gap means the collector was down, not that the load held steady.
-    Integrating across five hours of silence would invent consumption.
+    One hour at 100 W is 0.1 kWh; the six-hour silence that follows must
+    contribute nothing rather than inventing another 0.6.
     """
-    points = [[0, 100.0], [3600, 100.0], [3600 + 20000, 100.0]]
+    points = [[t, 100.0] for t in range(0, 3601, 60)]
+    points.append([3600 + 20000, 100.0])
     result = chart_data.summarise_power(points)
     assert abs(result["kwh"] - 0.1) < 1e-9
 
