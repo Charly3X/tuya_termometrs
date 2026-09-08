@@ -524,7 +524,7 @@ def get_series(settings_dict, token, device_id, hours, metrics):
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `./venv/bin/python3 -m pytest tests/test_history_client.py -v`
-Expected: 8 passed
+Expected: 9 passed
 
 - [ ] **Step 5: Commit**
 
