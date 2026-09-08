@@ -140,6 +140,12 @@ PlasmoidItem {
     }
     
     function loadChartData() {
+        if (!chartDeviceId) {
+            chartSeries = []
+            chartSummary = null
+            chartSource = "unavailable"
+            return
+        }
         var metrics = chartKind === "socket" ? "power" : "temperature,humidity"
         var cmd = "/home/charoyan/projects/tuya/venv/bin/python3 "
                 + "/home/charoyan/projects/tuya/tuya_client.py series "
@@ -285,6 +291,7 @@ PlasmoidItem {
                                         root.chartPeriod = 1
                                         root.chartSeries = []
                                         root.chartSummary = null
+                                        root.chartSource = "server"
                                         root.chartVisible = true
                                         root.loadChartData()
                                     }
@@ -458,6 +465,7 @@ PlasmoidItem {
                                     root.chartPeriod = 1
                                     root.chartSeries = []
                                     root.chartSummary = null
+                                    root.chartSource = "server"
                                     root.chartVisible = true
                                     root.loadChartData()
                                 }

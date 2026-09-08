@@ -428,8 +428,19 @@ if __name__ == "__main__":
     
     # Chart mode: output one or more metric series and exit
     if mode == "series":
+        # This argument vector arrives through shell word splitting (main.qml
+        # builds the command by string concatenation), so an empty device id
+        # does not stay empty -- it disappears and every later positional
+        # shifts left. Validate rather than trust args[1]/args[2].
         device_id = args[1] if len(args) > 1 else ""
-        hours = int(args[2]) if len(args) > 2 else 1
+        try:
+            hours = int(args[2]) if len(args) > 2 else 1
+        except ValueError:
+            hours = 0
+        if not device_id or hours <= 0:
+            print(json.dumps({"series": {}, "device": device_id,
+                              "source": "unavailable", "summary": None}))
+            sys.exit(0)
         metrics = (args[3] if len(args) > 3 else "power").split(",")
         app_settings = load_settings()
         token = (load_config() or {}).get("history_token", "")
