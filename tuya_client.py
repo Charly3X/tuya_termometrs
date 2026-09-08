@@ -12,6 +12,7 @@ from tuya_local import (
 )
 from tuya_history import add_readings, get_device_history
 import tuya_sharing_api
+import history_client
 from settings import load_settings
 
 CONFIG_FILE = Path(__file__).parent / "config.json"
@@ -420,8 +421,16 @@ if __name__ == "__main__":
     if mode == "history":
         device_id = args[1] if len(args) > 1 else ""
         hours = int(args[2]) if len(args) > 2 else 1
-        history = get_device_history(device_id, hours)
-        print(json.dumps({"history": history, "history_device": device_id}))
+        app_settings = load_settings()
+        token = (load_config() or {}).get("history_token", "")
+        history, source = history_client.get_history(
+            app_settings, token, device_id, hours
+        )
+        print(json.dumps({
+            "history": history,
+            "history_device": device_id,
+            "history_source": source,
+        }))
         sys.exit(0)
     
     # Load config
