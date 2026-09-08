@@ -1768,18 +1768,32 @@ Add a warning label inside the chart area, directly above the period selector
 Run: `./venv/bin/python3 tuya_client.py history bf973442af478b5404fupa 1`
 Expected: the same chart rows as before, plus `"history_source": "local"`
 
-- [ ] **Step 9: Install the QML change and restart the shell**
+- [ ] **Step 9: Check the QML edit without installing it**
 
-This is the one task in the plan that touches QML, so unlike every other task
-it needs the widget reinstalled:
+Do **not** copy the QML into the plasmoid and do **not** restart plasmashell.
+Two reasons: this work happens in a git worktree while `main.qml` hardcodes
+`/home/charoyan/projects/tuya/...`, so an installed copy would run the main
+checkout's Python and prove nothing; and restarting the shell disturbs a
+desktop that is in use. The owner installs and eyeballs it after the merge.
+
+Verify the edit is syntactically valid instead:
 
 ```bash
-cp contents/ui/main.qml ~/.local/share/plasma/plasmoids/org.kde.plasma.tuya/contents/ui/main.qml
-killall plasmashell && sleep 2 && nohup plasmashell &
+qmllint contents/ui/main.qml 2>&1 | grep -v "^Warning.*import" || true
 ```
 
-Click a socket in the widget. Expected: the chart draws, with the amber
-"локальные данные" line visible while no server is configured.
+If `qmllint` is not installed, check the braces balance instead:
+
+```bash
+./venv/bin/python3 -c "
+src = open('contents/ui/main.qml').read()
+assert src.count('{') == src.count('}'), 'unbalanced braces'
+assert 'chartSource' in src and 'history_source' in src
+print('QML edit looks structurally sound')
+"
+```
+
+Expected: no syntax complaints, and the check prints its confirmation.
 
 - [ ] **Step 10: Commit**
 
