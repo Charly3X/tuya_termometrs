@@ -141,12 +141,18 @@ def run(settings_dict, device_ids):
 
     database = settings_dict["server"]["database"]
     conn = storage.connect(database)
-    api = tuya_sharing_api.get_api()
 
-    push_ids, poll_ids, scales = roles.classify(api, device_ids)
-    log.info("push: %s", push_ids)
-    log.info("poll: %s", poll_ids)
-
+    # Exactly one Tuya session for the whole process. Manager builds its own
+    # CustomerApi internally, so calling tuya_sharing_api.get_api() as well
+    # would create a SECOND holder of the same refresh token, each with its
+    # own token listener. Every request is signed with the current refresh
+    # token and Tuya invalidates the old one on rotation, so whichever
+    # instance refreshed first would orphan the other -- and the SDK swallows
+    # the resulting failures ("net work error"). If the Manager's instance
+    # lost that race, SharingMQ could not renew its MQTT config at the ~2h
+    # mark and push would stop permanently, while shadow polling kept
+    # working: a service that looks alive, so Restart=always never fires.
+    # Everything that talks to Tuya goes through manager.customer_api.
     manager = Manager(
         tuya_sharing_api.CLIENT_ID,
         session["user_code"],
@@ -155,6 +161,12 @@ def run(settings_dict, device_ids):
         session["token_info"],
         tuya_sharing_api._TokenListener(session),
     )
+    api = manager.customer_api
+
+    push_ids, poll_ids, scales = roles.classify(api, device_ids)
+    log.info("push: %s", push_ids)
+    log.info("poll: %s", poll_ids)
+
     manager.update_device_cache()
     start_push(manager, database, scales)
 
