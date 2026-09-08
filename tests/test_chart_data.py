@@ -46,6 +46,30 @@ def test_downsampled_output_is_time_ordered():
     assert stamps == sorted(stamps)
 
 
+def test_downsampling_buckets_by_time_not_by_index():
+    """
+    Real series are irregular: Tuya only records a changed value, and the
+    collector leaves gaps when it is restarted. Everything the chart shows
+    rests on buckets being slices of TIME, not slices of the point list --
+    otherwise a dense burst gets spread across the whole width and the quiet
+    stretch after it gets squeezed into one bucket.
+
+    Here 100 of the 103 samples fall in the first quarter of the span. Time
+    bucketing spends one bucket on that burst and gives the sparse tail the
+    other three. Index bucketing would spend three of its four buckets inside
+    the burst -- so the ts < 100 count below is what tells the two apart.
+    """
+    points = [[t, 10.0] for t in range(100)]   # burst: ts 0..99
+    points[50] = [50, 99.0]                    # with a spike inside it
+    points += [[150, 20.0], [250, 30.0], [400, 40.0]]
+
+    result = chart_data.downsample(points, buckets=4)
+
+    # One bucket's worth of the burst survives, not three.
+    assert len([p for p in result if p[0] < 100]) == 2
+    assert result == [[0, 10.0], [50, 99.0], [150, 20.0], [250, 30.0], [400, 40.0]]
+
+
 def test_downsampling_an_empty_series():
     assert chart_data.downsample([], buckets=500) == []
 
