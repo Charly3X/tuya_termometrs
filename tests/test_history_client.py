@@ -5,7 +5,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pytest
 import history_client
 
-REMOTE_ROWS = [[100, 90.9, 236.5]]
+SERVER_ROWS = [[100, 23.6], [110, 23.7]]
+LOCAL_ROWS = [[100, 90.9], [110, 80.0]]
 
 
 @pytest.fixture
@@ -14,7 +15,7 @@ def server_url():
         protocol_version = "HTTP/1.1"
 
         def do_GET(self):
-            body = json.dumps(REMOTE_ROWS).encode()
+            body = json.dumps(SERVER_ROWS).encode()
             self.send_response(200)
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
@@ -29,55 +30,142 @@ def server_url():
     server.shutdown()
 
 
-def test_uses_the_server_when_it_answers(server_url, monkeypatch):
-    monkeypatch.setattr(history_client, "local_history", lambda d, h: [["local"]])
-    rows, source = history_client.get_history(
-        {"history_server": server_url, "history_timeout": 3}, "tok", "dev1", 1
+@pytest.fixture
+def local_rows(monkeypatch):
+    monkeypatch.setattr(history_client, "local_power", lambda d, h: list(LOCAL_ROWS))
+
+
+def test_server_answer_is_used(server_url, local_rows):
+    series, source, summary = history_client.get_series(
+        {"history_server": server_url, "history_timeout": 3}, "tok", "dev", 1,
+        ["temperature"],
     )
-    assert rows == REMOTE_ROWS
+    assert series == {"temperature": SERVER_ROWS}
+    assert source == "server"
+    assert summary is None
+
+
+def test_several_metrics_are_fetched_together(server_url, local_rows):
+    series, source, _ = history_client.get_series(
+        {"history_server": server_url, "history_timeout": 3}, "tok", "dev", 1,
+        ["temperature", "humidity"],
+    )
+    assert set(series) == {"temperature", "humidity"}
     assert source == "server"
 
 
-def test_falls_back_when_the_server_is_unreachable(monkeypatch):
-    monkeypatch.setattr(history_client, "local_history", lambda d, h: [["local"]])
-    rows, source = history_client.get_history(
+def test_power_falls_back_to_the_local_file(local_rows):
+    series, source, summary = history_client.get_series(
         {"history_server": "http://127.0.0.1:1", "history_timeout": 1},
-        "tok", "dev1", 1,
+        "tok", "dev", 1, ["power"],
     )
-    assert rows == [["local"]]
+    assert series == {"power": LOCAL_ROWS}
     assert source == "local"
+    assert summary is not None
 
 
-def test_falls_back_when_no_server_is_configured(monkeypatch):
-    monkeypatch.setattr(history_client, "local_history", lambda d, h: [["local"]])
-    rows, source = history_client.get_history(
-        {"history_server": "", "history_timeout": 3}, "tok", "dev1", 1
-    )
-    assert rows == [["local"]]
-    assert source == "local"
-
-
-def test_empty_server_answer_falls_back_instead_of_blanking_the_chart(monkeypatch):
+def test_temperature_has_no_local_fallback(local_rows):
     """
-    An empty list is a valid HTTP answer, not a failure -- but treating it as
-    data blanks the chart right after deployment, while the collector has no
-    rows for this device yet and the local file still does.
+    The local file only ever held power and voltage. Reporting "local" here
+    would promise data that does not exist.
     """
-    monkeypatch.setattr(history_client, "local_history", lambda d, h: [["local"]])
-    monkeypatch.setattr(history_client, "fetch_remote", lambda *a, **k: [])
-    rows, source = history_client.get_history(
-        {"history_server": "http://example", "history_timeout": 3}, "tok", "dev1", 1
+    series, source, summary = history_client.get_series(
+        {"history_server": "http://127.0.0.1:1", "history_timeout": 1},
+        "tok", "dev", 1, ["temperature", "humidity"],
     )
-    assert rows == [["local"]]
+    assert series == {}
+    assert source == "unavailable"
+    assert summary is None
+
+
+def test_no_server_configured_still_serves_power_locally(local_rows):
+    series, source, _ = history_client.get_series(
+        {"history_server": "", "history_timeout": 3}, "tok", "dev", 1, ["power"],
+    )
+    assert series == {"power": LOCAL_ROWS}
     assert source == "local"
 
 
-def test_empty_from_both_sides_is_reported_as_server(monkeypatch):
-    """Nothing anywhere is not a fallback situation; do not cry wolf."""
-    monkeypatch.setattr(history_client, "local_history", lambda d, h: [])
-    monkeypatch.setattr(history_client, "fetch_remote", lambda *a, **k: [])
-    rows, source = history_client.get_history(
-        {"history_server": "http://example", "history_timeout": 3}, "tok", "dev1", 1
+def test_empty_server_answer_is_treated_as_no_data(local_rows, monkeypatch):
+    monkeypatch.setattr(history_client, "fetch_series", lambda *a, **k: [])
+    series, source, _ = history_client.get_series(
+        {"history_server": "http://example", "history_timeout": 3},
+        "tok", "dev", 1, ["power"],
     )
-    assert rows == []
+    assert series == {"power": LOCAL_ROWS}
+    assert source == "local"
+
+
+def test_server_answered_with_nothing_reports_empty(monkeypatch):
+    """
+    The collector answered, it just has not recorded this device yet. Saying
+    "unavailable" here would send the user to debug a server that is alive,
+    and the spec's own fallback table ends a plug with no data anywhere at
+    "нет данных", not at "сервер недоступен".
+    """
+    monkeypatch.setattr(history_client, "fetch_series", lambda *a, **k: [])
+    monkeypatch.setattr(history_client, "local_power", lambda d, h: [])
+    series, source, summary = history_client.get_series(
+        {"history_server": "http://example", "history_timeout": 3},
+        "tok", "dev", 1, ["power"],
+    )
+    assert series == {}
+    assert source == "empty"
+    assert summary is None
+
+
+def test_unreachable_server_reports_unavailable(monkeypatch):
+    """
+    The other half of the pair: fetch_series returns None only when the
+    request itself failed, and that is the one case worth naming the server
+    for.
+    """
+    monkeypatch.setattr(history_client, "fetch_series", lambda *a, **k: None)
+    monkeypatch.setattr(history_client, "local_power", lambda d, h: [])
+    series, source, summary = history_client.get_series(
+        {"history_server": "http://example", "history_timeout": 3},
+        "tok", "dev", 1, ["power"],
+    )
+    assert series == {}
+    assert source == "unavailable"
+    assert summary is None
+
+
+def test_no_server_configured_and_no_local_data_is_unavailable(monkeypatch):
+    """An unconfigured server is still a server the widget cannot reach."""
+    monkeypatch.setattr(history_client, "local_power", lambda d, h: [])
+    _, source, _ = history_client.get_series(
+        {"history_server": "", "history_timeout": 3}, "tok", "dev", 1, ["power"],
+    )
+    assert source == "unavailable"
+
+
+def test_series_are_downsampled(monkeypatch):
+    monkeypatch.setattr(
+        history_client, "fetch_series",
+        lambda *a, **k: [[i, float(i)] for i in range(12000)],
+    )
+    series, source, _ = history_client.get_series(
+        {"history_server": "http://example", "history_timeout": 3},
+        "tok", "dev", 24, ["power"],
+    )
     assert source == "server"
+    assert len(series["power"]) < 12000
+
+
+def test_summary_is_computed_before_downsampling(monkeypatch):
+    """
+    The reason get_series returns a summary at all instead of leaving it to
+    the caller. This series is 10% duty: 90 W for one sample in ten, 0 W
+    otherwise, so the true mean is 9 W. Downsampling keeps each bucket's min
+    and max, collapsing it to an alternating 0/90 series whose mean is 45 W.
+    Summarising the drawn data would overstate consumption fivefold.
+    """
+    raw = [[i, 90.0 if i % 10 == 0 else 0.0] for i in range(12000)]
+    monkeypatch.setattr(history_client, "fetch_series", lambda *a, **k: raw)
+    series, source, summary = history_client.get_series(
+        {"history_server": "http://example", "history_timeout": 3},
+        "tok", "dev", 24, ["power"],
+    )
+    assert len(series["power"]) < 12000       # it really was downsampled
+    assert abs(summary["avg"] - 9.0) < 0.5    # but the mean came from the raw rows

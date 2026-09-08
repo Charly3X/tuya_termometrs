@@ -425,19 +425,39 @@ if __name__ == "__main__":
     mode = args[0] if len(args) > 0 else "all"
     connection_mode = args[1] if len(args) > 1 else "cloud"
     
-    # History mode: output chart data and exit
-    if mode == "history":
+    # Chart mode: output one or more metric series and exit
+    if mode == "series":
+        # This argument vector arrives through shell word splitting (main.qml
+        # builds the command by string concatenation), so an empty device id
+        # does not stay empty -- it disappears and every later positional
+        # shifts left. Validate rather than trust args[1]/args[2].
         device_id = args[1] if len(args) > 1 else ""
-        hours = int(args[2]) if len(args) > 2 else 1
+        try:
+            hours = int(args[2]) if len(args) > 2 else 1
+        except ValueError:
+            hours = 0
+        if not device_id or hours <= 0:
+            # No request was made, so the server's health is unknown: "empty"
+            # makes the widget say "нет данных" instead of blaming a machine
+            # nobody asked.
+            print(json.dumps({"series": {}, "device": device_id,
+                              "source": "empty", "summary": None}))
+            sys.exit(0)
+        metrics = (args[3] if len(args) > 3 else "power").split(",")
         app_settings = load_settings()
         token = (load_config() or {}).get("history_token", "")
-        history, source = history_client.get_history(
-            app_settings, token, device_id, hours
+        # The summary comes back from get_series rather than being computed
+        # here, because it has to be taken from the raw rows: the series in
+        # hand is already downsampled, and averaging min/max pairs would
+        # overstate consumption several-fold.
+        series, source, summary = history_client.get_series(
+            app_settings, token, device_id, hours, metrics
         )
         print(json.dumps({
-            "history": history,
-            "history_device": device_id,
-            "history_source": source,
+            "series": series,
+            "device": device_id,
+            "source": source,
+            "summary": summary,
         }))
         sys.exit(0)
     

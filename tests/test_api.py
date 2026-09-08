@@ -42,33 +42,20 @@ def fetch(url, token=TOKEN):
         return json.loads(response.read())
 
 
-def test_history_returns_the_widget_shape(base_url):
-    # hours must be large enough that "now - hours*3600" reaches back past
-    # the fixture's near-epoch timestamps (1000, 1010) regardless of the
-    # real wall-clock date the suite runs on; 99999 hours (~11 years) is
-    # not enough once run more than ~11 years after 1970.
-    result = fetch(f"{base_url}/history?device=dev1&hours=999999999")
-    assert result == [[1000, 90.9, 236.5], [1010, 80.0, 236.5]]
-
-
 def test_series_returns_pairs(base_url):
     result = fetch(f"{base_url}/series?device=dev2&metric=temperature&hours=999999999")
     assert result == [[1020, 23.6]]
 
 
-def test_unknown_device_is_an_empty_list_not_an_error(base_url):
-    assert fetch(f"{base_url}/history?device=nobody&hours=24") == []
-
-
 def test_missing_token_is_rejected(base_url):
     with pytest.raises(urllib.error.HTTPError) as excinfo:
-        fetch(f"{base_url}/history?device=dev1&hours=24", token=None)
+        fetch(f"{base_url}/series?device=dev1&metric=power&hours=24", token=None)
     assert excinfo.value.code == 401
 
 
 def test_wrong_token_is_rejected(base_url):
     with pytest.raises(urllib.error.HTTPError) as excinfo:
-        fetch(f"{base_url}/history?device=dev1&hours=24", token="guess")
+        fetch(f"{base_url}/series?device=dev1&metric=power&hours=24", token="guess")
     assert excinfo.value.code == 401
 
 
@@ -80,7 +67,7 @@ def test_unknown_path_is_404(base_url):
 
 def test_there_is_no_write_endpoint(base_url):
     request = urllib.request.Request(
-        f"{base_url}/history?device=dev1&hours=24", data=b"{}", method="POST"
+        f"{base_url}/series?device=dev1&metric=power&hours=24", data=b"{}", method="POST"
     )
     request.add_header("Authorization", f"Bearer {TOKEN}")
     with pytest.raises(urllib.error.HTTPError) as excinfo:
@@ -103,13 +90,13 @@ def test_empty_token_refuses_to_start(tmp_path):
 
 def test_non_numeric_hours_is_400(base_url):
     with pytest.raises(urllib.error.HTTPError) as excinfo:
-        fetch(f"{base_url}/history?device=dev1&hours=abc")
+        fetch(f"{base_url}/series?device=dev1&metric=power&hours=abc")
     assert excinfo.value.code == 400
 
 
 def test_zero_hours_is_400(base_url):
     with pytest.raises(urllib.error.HTTPError) as excinfo:
-        fetch(f"{base_url}/history?device=dev1&hours=0")
+        fetch(f"{base_url}/series?device=dev1&metric=power&hours=0")
     assert excinfo.value.code == 400
 
 
@@ -120,7 +107,7 @@ def test_non_finite_hours_is_400(base_url, value):
     # so they must be rejected explicitly rather than relying on
     # whatever arithmetic happens to raise downstream.
     with pytest.raises(urllib.error.HTTPError) as excinfo:
-        fetch(f"{base_url}/history?device=dev1&hours={value}")
+        fetch(f"{base_url}/series?device=dev1&metric=power&hours={value}")
     assert excinfo.value.code == 400
 
 
@@ -129,8 +116,8 @@ def test_absurdly_large_but_finite_hours_still_works(base_url, value):
     # These clamp to the retention window rather than being rejected; the
     # clamped window is still wide enough to cover every fixture row. Before
     # the clamp, 1e307 overflowed hours * 3600 to +inf and was a 400.
-    result = fetch(f"{base_url}/history?device=dev1&hours={value}")
-    assert result == [[1000, 90.9, 236.5], [1010, 80.0, 236.5]]
+    result = fetch(f"{base_url}/series?device=dev1&metric=power&hours={value}")
+    assert result == [[1000, 90.9], [1010, 80.0]]
 
 
 def make_server(tmp_path, rows, retention_days):
@@ -158,9 +145,9 @@ def test_hours_is_clamped_to_the_retention_window(tmp_path):
         retention_days=2,
     )
     try:
-        result = fetch(f"http://127.0.0.1:{server.server_port}/history"
-                       f"?device=dev1&hours=999999999")
-        assert result == [[now - 3600, 2.0, 0.0]]
+        result = fetch(f"http://127.0.0.1:{server.server_port}/series"
+                       f"?device=dev1&metric=power&hours=999999999")
+        assert result == [[now - 3600, 2.0]]
     finally:
         server.shutdown()
         conn.close()
@@ -175,9 +162,9 @@ def test_hours_within_the_retention_window_is_untouched(tmp_path):
         retention_days=365,
     )
     try:
-        result = fetch(f"http://127.0.0.1:{server.server_port}/history"
-                       f"?device=dev1&hours=720")
-        assert result == [[now - 10 * 86400, 1.0, 230.0], [now - 3600, 2.0, 230.0]]
+        result = fetch(f"http://127.0.0.1:{server.server_port}/series"
+                       f"?device=dev1&metric=power&hours=720")
+        assert result == [[now - 10 * 86400, 1.0], [now - 3600, 2.0]]
     finally:
         server.shutdown()
         conn.close()
@@ -192,8 +179,8 @@ def test_a_retention_large_enough_to_overflow_since_is_400(tmp_path):
     server, conn = make_server(tmp_path, [(1000, {"power": 1.0})], retention_days=1e305)
     try:
         with pytest.raises(urllib.error.HTTPError) as excinfo:
-            fetch(f"http://127.0.0.1:{server.server_port}/history"
-                  f"?device=dev1&hours=1e307")
+            fetch(f"http://127.0.0.1:{server.server_port}/series"
+                  f"?device=dev1&metric=power&hours=1e307")
         assert excinfo.value.code == 400
     finally:
         server.shutdown()
@@ -220,8 +207,8 @@ def test_absent_hours_defaults_to_24_and_returns_data(tmp_path):
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        result = fetch(f"http://127.0.0.1:{server.server_port}/history?device=dev1")
-        assert result == [[now - 60, 42.0, 230.0]]
+        result = fetch(f"http://127.0.0.1:{server.server_port}/series?device=dev1&metric=power")
+        assert result == [[now - 60, 42.0]]
     finally:
         server.shutdown()
         conn.close()

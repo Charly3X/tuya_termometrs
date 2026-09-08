@@ -109,7 +109,7 @@ Check from the desktop:
 
 ```bash
 curl -H "Authorization: Bearer <token>" \
-  "http://<server-ip>:8080/history?device=<socket-id>&hours=1"
+  "http://<server-ip>:8080/series?device=<socket-id>&metric=power&hours=1"
 ```
 
 ## Gaps in the data are normal
