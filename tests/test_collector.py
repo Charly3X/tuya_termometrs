@@ -361,11 +361,11 @@ def test_run_polls_shadow_only_once_per_poll_interval(monkeypatch, tmp_path):
     test_run_builds_exactly_one_tuya_session would not catch it: that test
     only exercises the very first iteration.
 
-    900 is an exact multiple of HEARTBEAT_SECONDS (15 x 60), so with the
-    first poll firing unconditionally on tick 1 (last_poll is None), the
-    next one is due exactly when 15 more 60s ticks have elapsed -- tick 16.
-    Both time.time() and time.sleep() are faked so the 16 ticks this drives
-    through are instant instead of a 15-minute real wait.
+    900 is an exact multiple of HEARTBEAT_SECONDS (15 x 60). The first call
+    is the seeding poll that run() makes before entering the loop at all;
+    the loop then starts its clock, skips ticks 1-15 and polls again on
+    tick 16. Both time.time() and time.sleep() are faked so the 16 ticks
+    this drives through are instant instead of a 15-minute real wait.
     """
     monkeypatch.setattr(tuya_sharing_api, "load_session", lambda: FAKE_SESSION)
     monkeypatch.setattr(tuya_sharing_api, "prefer_ipv4", lambda: None)
@@ -426,3 +426,64 @@ def test_run_polls_shadow_only_once_per_poll_interval(monkeypatch, tmp_path):
     # total across all 16 ticks -- not 1 (poll never repeats) and not 16
     # (poll fires every tick).
     assert len(poll_once_calls) == 2
+
+
+def test_run_seeds_every_device_including_the_pushed_ones(monkeypatch, tmp_path):
+    """
+    The heartbeat can only carry a value forward once it has one. A push-only
+    device supplies its first value whenever it next decides to report, which
+    for a thermometer is hours away, so without a seeding read it writes
+    nothing at all after a restart while its polled neighbours heartbeat
+    immediately. Measured on the running server before this was fixed.
+
+    So the seeding poll must cover the push group too, not just the poll group.
+    """
+    monkeypatch.setattr(tuya_sharing_api, "load_session", lambda: FAKE_SESSION)
+    monkeypatch.setattr(tuya_sharing_api, "prefer_ipv4", lambda: None)
+    monkeypatch.setattr(
+        tuya_sharing_api, "get_api",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("second session")),
+    )
+
+    class _FakeManager:
+        def __init__(self, *args, **kwargs):
+            self.customer_api = object()
+            self.user_homes = []
+            self.device_map = {}
+
+        def update_device_cache(self):
+            pass
+
+    monkeypatch.setattr(collector, "Manager", _FakeManager)
+    monkeypatch.setattr(
+        collector, "start_push", lambda manager, database, scales, last_values=None: None
+    )
+
+    # pushed device first, polled device second
+    monkeypatch.setattr(
+        collector.roles, "classify",
+        lambda api, device_ids: (["pushed"], ["polled"], {d: {} for d in device_ids}),
+    )
+
+    polled_sets = []
+
+    def fake_poll_once(api, conn, device_ids, scales, seen=None, last_values=None):
+        polled_sets.append(list(device_ids))
+
+    monkeypatch.setattr(collector, "poll_once", fake_poll_once)
+    monkeypatch.setattr(collector.time, "time", lambda: 1_000_000)
+    monkeypatch.setattr(
+        collector.time, "sleep",
+        lambda seconds: (_ for _ in ()).throw(_LoopBroken()),
+    )
+
+    settings_dict = {
+        "server": {"database": str(tmp_path / "collector.db"), "poll_interval": 900},
+    }
+
+    with pytest.raises(_LoopBroken):
+        collector.run(settings_dict, ["pushed", "polled"])
+
+    assert polled_sets, "run() never seeded anything"
+    assert "pushed" in polled_sets[0], "the seeding read skipped the push group"
+    assert "polled" in polled_sets[0]

@@ -282,7 +282,18 @@ def run(settings_dict, device_ids):
     # its own, tighter cadence without changing that.
     interval = settings_dict["server"]["poll_interval"]
     seen = {}
-    last_poll = None
+    # Seed last_values from the shadow for EVERY device, push ones included.
+    # The heartbeat can only carry a value forward once it has one, and a
+    # push-only device supplies its first value whenever it next feels like
+    # reporting -- for a thermometer that is hours away. Measured after a
+    # restart: the polled sensors heartbeated immediately because their first
+    # poll seeded them, while the pushed sensor wrote nothing at all.
+    try:
+        poll_once(api, conn, device_ids, scales, seen, last_values)
+    except Exception as e:
+        log.error("initial shadow seed failed: %s", e)
+
+    last_poll = int(time.time())
     while True:
         now = int(time.time())
         try:
