@@ -61,6 +61,60 @@ def test_shadow_property_without_a_timestamp_is_skipped(conn):
     assert storage.series(conn, "dev2", "temperature", 0) == []
 
 
+class _FakeShadowApi:
+    """Returns the same shadow answer every time, exactly like Tuya does."""
+
+    def __init__(self, properties):
+        self.properties = properties
+        self.calls = 0
+
+    def get(self, path):
+        self.calls += 1
+        return {"result": {"properties": self.properties}}
+
+
+def test_second_poll_of_unchanged_shadow_data_writes_nothing(conn):
+    # The shadow endpoint keeps returning the last reported value forever.
+    # These sensors report every 20-45 minutes, so most polls see nothing
+    # new and must not re-insert what is already stored.
+    api = _FakeShadowApi([
+        {"code": "temp_current", "value": 244, "time": 1788844610734},
+        {"code": "humidity_value", "value": 51, "time": 1788844610734},
+    ])
+    seen = {}
+    collector.poll_once(api, conn, ["dev2"], {"dev2": SCALES}, seen)
+    collector.poll_once(api, conn, ["dev2"], {"dev2": SCALES}, seen)
+    collector.poll_once(api, conn, ["dev2"], {"dev2": SCALES}, seen)
+
+    assert api.calls == 3  # the polls really happened
+    assert storage.series(conn, "dev2", "temperature", 0) == [(1788844610, 24.4)]
+    assert storage.series(conn, "dev2", "humidity", 0) == [(1788844610, 51.0)]
+
+
+def test_poll_records_a_reading_once_its_timestamp_advances(conn):
+    api = _FakeShadowApi([{"code": "temp_current", "value": 244, "time": 1788844610734}])
+    seen = {}
+    collector.poll_once(api, conn, ["dev2"], {"dev2": SCALES}, seen)
+    api.properties = [{"code": "temp_current", "value": 251, "time": 1788846610734}]
+    collector.poll_once(api, conn, ["dev2"], {"dev2": SCALES}, seen)
+
+    assert storage.series(conn, "dev2", "temperature", 0) == [
+        (1788844610, 24.4),
+        (1788846610, 25.1),
+    ]
+
+
+def test_shadow_dedup_is_tracked_per_device_and_metric(conn):
+    # Two devices reporting the same metric at the same instant are two
+    # separate readings; one must not mask the other.
+    api = _FakeShadowApi([{"code": "temp_current", "value": 244, "time": 1788844610734}])
+    seen = {}
+    collector.poll_once(api, conn, ["dev2", "dev3"], {"dev2": SCALES, "dev3": SCALES}, seen)
+
+    assert storage.series(conn, "dev2", "temperature", 0) == [(1788844610, 24.4)]
+    assert storage.series(conn, "dev3", "temperature", 0) == [(1788844610, 24.4)]
+
+
 def test_push_listener_writes_from_the_mqtt_callback_thread(tmp_path):
     """
     Reproduces the real bug: paho-mqtt calls update_device() on its own

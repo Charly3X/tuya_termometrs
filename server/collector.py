@@ -32,13 +32,23 @@ def record(conn, device_id, status, scales, ts):
     return storage.write(conn, ts, device_id, values)
 
 
-def record_shadow(conn, device_id, properties, scales):
+def record_shadow(conn, device_id, properties, scales, seen=None):
     """
     Store shadow properties, each at the time the device reported it.
 
     Shadow carries a per-property millisecond timestamp, which is more honest
     than stamping everything with the poll time: these sensors report minutes
     apart from each other.
+
+    `seen` is a {(device, metric): last_ts} map the caller carries across
+    polls. The shadow endpoint keeps returning the last reported value
+    forever, so without it every unchanged reading is re-inserted on every
+    poll: measured, these sensors report every 20-45 minutes, so each
+    reading lands again and again until the device finally reports a new
+    one. A property whose timestamp has not advanced is a reading we
+    already stored, so it is skipped. Deliberately not enforced with a
+    UNIQUE index -- that would change storage.write() for the push path too,
+    where two identical readings at different times are legitimate data.
     """
     written = 0
     for prop in properties:
@@ -48,9 +58,13 @@ def record_shadow(conn, device_id, properties, scales):
         if not converted:
             continue
         metric, value = converted
-        written += storage.write(
-            conn, int(prop["time"] // 1000), device_id, {metric: value}
-        )
+        ts = int(prop["time"] // 1000)
+        if seen is not None:
+            key = (device_id, metric)
+            if key in seen and ts <= seen[key]:
+                continue
+            seen[key] = ts
+        written += storage.write(conn, ts, device_id, {metric: value})
     return written
 
 
@@ -121,13 +135,18 @@ def start_push(manager, database, scales):
     return mq
 
 
-def poll_once(api, conn, device_ids, scales):
-    """One shadow poll for every device that cannot be read from the push."""
+def poll_once(api, conn, device_ids, scales, seen=None):
+    """
+    One shadow poll for every device that cannot be read from the push.
+
+    Pass the same `seen` map on every call so unchanged readings are not
+    stored again -- see record_shadow().
+    """
     for device_id in device_ids:
         try:
             response = api.get(f"/v1.0/m/life/ha/{device_id}/shadow/properties")
             properties = (response or {}).get("result", {}).get("properties", [])
-            record_shadow(conn, device_id, properties, scales.get(device_id, {}))
+            record_shadow(conn, device_id, properties, scales.get(device_id, {}), seen)
         except Exception as e:
             log.error("shadow poll failed for %s: %s", device_id, e)
 
@@ -171,8 +190,9 @@ def run(settings_dict, device_ids):
     start_push(manager, database, scales)
 
     interval = settings_dict["server"]["poll_interval"]
+    seen = {}
     while True:
-        poll_once(api, conn, poll_ids, scales)
+        poll_once(api, conn, poll_ids, scales, seen)
         time.sleep(interval)
 
 

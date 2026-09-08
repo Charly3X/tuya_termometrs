@@ -9,6 +9,6 @@
         "database": "/var/lib/tuya/readings.db",
         "port": 8080,
         "retention_days": 365,
-        "poll_interval": 300
+        "poll_interval": 900
     }
 }

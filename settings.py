@@ -21,7 +21,9 @@ DEFAULTS = {
         "database": "readings.db",
         "port": 8080,
         "retention_days": 365,
-        "poll_interval": 300,
+        # Shadow-polled sensors were measured reporting every 20-45 minutes,
+        # so a shorter interval buys no extra resolution -- only API calls.
+        "poll_interval": 900,
     },
 }
 
