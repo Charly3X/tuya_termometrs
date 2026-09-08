@@ -61,6 +61,14 @@ The widget UI is implemented in QML and periodically calls a local Python script
   - Python dependency list (`tinytuya`).
 - `list_devices.py`, `test_region.py`, `test_statistics.py`
   - Helper scripts for manual testing and diagnostics.
+- `server/`
+  - Collector and history API that run on the Oracle box, not on the desktop.
+  - See `server/README.md` for deployment. Design rationale and the
+    measurements behind it are in
+    `docs/superpowers/specs/2026-09-08-oracle-monitoring-design.md`.
+- `settings.py`, `settings.json`
+  - Behaviour settings, kept apart from the secrets in `config.json`.
+  - `settings.json` is gitignored; `settings.json.example` is the template.
 
 ## How the widget works (data flow)
 
