@@ -20,8 +20,34 @@ from tuya_sharing.mq import SharingMQ
 
 log = logging.getLogger("collector")
 
+# How often a heartbeat "still the same" row is written for a metric that has
+# gone quiet, and which metrics are worth it. Power is the one that sits at a
+# constant, meaningful 0 for long stretches (compressor off, device idle) --
+# other metrics either change often enough to keep arriving on their own, or
+# their absence is not informative in the same way.
+HEARTBEAT_SECONDS = 60
+HEARTBEAT_METRICS = ("power",)
 
-def record(conn, device_id, status, scales, ts):
+# Guards every read-modify-write of a `last_values` map shared between the
+# MQTT callback thread (_PushListener, via record()) and the main thread
+# (heartbeat(), record_shadow() during polling). Dict item assignment and
+# .get() are individually atomic under CPython's GIL, but heartbeat's
+# "read the last value, decide whether it is stale, then refresh its
+# timestamp" is three separate operations -- without a lock a push landing
+# in the middle of that sequence could be silently overwritten or read
+# half-updated. The lock makes that sequence atomic instead of relying on
+# an interpreter implementation detail.
+_last_values_lock = threading.Lock()
+
+
+def _remember(last_values, device_id, metric, ts, value):
+    if last_values is None:
+        return
+    with _last_values_lock:
+        last_values[(device_id, metric)] = [ts, value]
+
+
+def record(conn, device_id, status, scales, ts, last_values=None):
     """Convert a {code: value} report and store it. Returns rows written."""
     values = {}
     for code, raw in status.items():
@@ -29,10 +55,13 @@ def record(conn, device_id, status, scales, ts):
         if converted:
             metric, value = converted
             values[metric] = value
-    return storage.write(conn, ts, device_id, values)
+    written = storage.write(conn, ts, device_id, values)
+    for metric, value in values.items():
+        _remember(last_values, device_id, metric, ts, value)
+    return written
 
 
-def record_shadow(conn, device_id, properties, scales, seen=None):
+def record_shadow(conn, device_id, properties, scales, seen=None, last_values=None):
     """
     Store shadow properties, each at the time the device reported it.
 
@@ -65,13 +94,50 @@ def record_shadow(conn, device_id, properties, scales, seen=None):
                 continue
             seen[key] = ts
         written += storage.write(conn, ts, device_id, {metric: value})
+        _remember(last_values, device_id, metric, ts, value)
+    return written
+
+
+def heartbeat(conn, last_values, online, now):
+    """
+    Write one "still the same" row per heartbeat metric that has gone quiet,
+    for devices that are currently online.
+
+    A push protocol only sends changes, so silence from an ONLINE device is
+    a sound basis for "unchanged" -- but silence from an OFFLINE (or unknown)
+    device means "unknown", and writing anything then would be a lie. Devices
+    missing from `online`, or mapped to False, are therefore skipped
+    entirely, even if their last value is stale.
+
+    `last_values` is the same {(device_id, metric): [ts, value]} map that
+    record() and record_shadow() populate, mutated in place here too so the
+    heartbeat clock resets once a row is written -- otherwise every
+    subsequent tick within the hour would heartbeat again.
+
+    Returns the number of rows written.
+    """
+    written = 0
+    with _last_values_lock:
+        for device_id, is_online in online.items():
+            if not is_online:
+                continue
+            for metric in HEARTBEAT_METRICS:
+                entry = last_values.get((device_id, metric))
+                if entry is None:
+                    continue
+                ts, value = entry
+                if now - ts < HEARTBEAT_SECONDS:
+                    continue
+                written += storage.write(conn, now, device_id, {metric: value})
+                entry[0] = now
     return written
 
 
 class _PushListener(SharingDeviceListener):
-    def __init__(self, database, scales):
+    def __init__(self, database, scales, last_values=None):
         self.database = database
         self.scales = scales
+        self.last_values = last_values
         self._local = threading.local()
 
     def _conn(self):
@@ -103,7 +169,12 @@ class _PushListener(SharingDeviceListener):
         status = {c: device.status.get(c) for c in updated_status_properties}
         scales = self.scales.get(device.id, {})
         try:
-            record(self._conn(), device.id, status, scales, int(time.time()))
+            # record() takes _last_values_lock internally before touching
+            # self.last_values, which heartbeat() (main thread) reads and
+            # updates under the same lock -- see _remember()'s docstring.
+            # The sqlite connection stays per-thread as above; only the
+            # last_values dict is actually shared, and only through the lock.
+            record(self._conn(), device.id, status, scales, int(time.time()), self.last_values)
         except Exception as e:
             log.error("failed to record push from %s: %s", device.id, e)
 
@@ -114,7 +185,7 @@ class _PushListener(SharingDeviceListener):
         pass
 
 
-def start_push(manager, database, scales):
+def start_push(manager, database, scales, last_values=None):
     """
     Subscribe to device topics directly.
 
@@ -123,7 +194,7 @@ def start_push(manager, database, scales):
     so it delivers nothing. Measured: 0 events in 90s through refresh_mq,
     27 events in 90s through this path.
     """
-    manager.add_device_listener(_PushListener(database, scales))
+    manager.add_device_listener(_PushListener(database, scales, last_values))
     mq = SharingMQ(
         manager.customer_api,
         [home.id for home in manager.user_homes],
@@ -135,7 +206,7 @@ def start_push(manager, database, scales):
     return mq
 
 
-def poll_once(api, conn, device_ids, scales, seen=None):
+def poll_once(api, conn, device_ids, scales, seen=None, last_values=None):
     """
     One shadow poll for every device that cannot be read from the push.
 
@@ -146,7 +217,7 @@ def poll_once(api, conn, device_ids, scales, seen=None):
         try:
             response = api.get(f"/v1.0/m/life/ha/{device_id}/shadow/properties")
             properties = (response or {}).get("result", {}).get("properties", [])
-            record_shadow(conn, device_id, properties, scales.get(device_id, {}), seen)
+            record_shadow(conn, device_id, properties, scales.get(device_id, {}), seen, last_values)
         except Exception as e:
             log.error("shadow poll failed for %s: %s", device_id, e)
 
@@ -190,13 +261,30 @@ def run(settings_dict, device_ids):
     log.info("poll: %s", poll_ids)
 
     manager.update_device_cache()
-    start_push(manager, database, scales)
+    last_values = {}
+    start_push(manager, database, scales, last_values)
 
+    # The shadow poll stays on its own, much longer poll_interval (900s by
+    # default) -- these sensors were measured reporting every 20-45 minutes,
+    # so polling faster buys no resolution, only extra API calls. The loop
+    # itself now ticks every HEARTBEAT_SECONDS so the heartbeat can run on
+    # its own, tighter cadence without changing that.
     interval = settings_dict["server"]["poll_interval"]
     seen = {}
+    last_poll = None
     while True:
-        poll_once(api, conn, poll_ids, scales, seen)
-        time.sleep(interval)
+        now = int(time.time())
+        # Read online state straight from the SDK's own bookkeeping rather
+        # than tracking it ourselves -- Manager already updates
+        # device_map[id].online from MQTT bizCode online/offline events.
+        online = {
+            device_id: device.online for device_id, device in manager.device_map.items()
+        }
+        heartbeat(conn, last_values, online, now)
+        if last_poll is None or now - last_poll >= interval:
+            poll_once(api, conn, poll_ids, scales, seen, last_values)
+            last_poll = now
+        time.sleep(HEARTBEAT_SECONDS)
 
 
 if __name__ == "__main__":

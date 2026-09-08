@@ -116,6 +116,73 @@ def test_shadow_dedup_is_tracked_per_device_and_metric(conn):
     assert storage.series(conn, "dev3", "temperature", 0) == [(1788844610, 24.4)]
 
 
+def test_heartbeat_writes_a_row_for_a_stale_metric_of_an_online_device(conn):
+    last_values = {("dev1", "power"): [100, 42.0]}
+    online = {"dev1": True}
+    written = collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_SECONDS)
+    assert written == 1
+    assert storage.series(conn, "dev1", "power", 0) == [
+        (100 + collector.HEARTBEAT_SECONDS, 42.0)
+    ]
+
+
+def test_heartbeat_leaves_a_recently_written_metric_alone(conn):
+    last_values = {("dev1", "power"): [100, 42.0]}
+    online = {"dev1": True}
+    written = collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_SECONDS - 1)
+    assert written == 0
+    assert storage.series(conn, "dev1", "power", 0) == []
+
+
+def test_heartbeat_skips_an_offline_device(conn):
+    last_values = {("dev1", "power"): [100, 42.0]}
+    online = {"dev1": False}
+    written = collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_SECONDS)
+    assert written == 0
+    assert storage.series(conn, "dev1", "power", 0) == []
+
+
+def test_heartbeat_skips_a_device_absent_from_online(conn):
+    last_values = {("dev1", "power"): [100, 42.0]}
+    online = {}
+    written = collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_SECONDS)
+    assert written == 0
+    assert storage.series(conn, "dev1", "power", 0) == []
+
+
+def test_heartbeat_never_writes_a_non_heartbeat_metric(conn):
+    last_values = {("dev1", "temperature"): [100, 21.0]}
+    online = {"dev1": True}
+    written = collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_SECONDS)
+    assert written == 0
+    assert storage.series(conn, "dev1", "temperature", 0) == []
+
+
+def test_second_heartbeat_immediately_after_the_first_writes_nothing(conn):
+    last_values = {("dev1", "power"): [100, 42.0]}
+    online = {"dev1": True}
+    now = 100 + collector.HEARTBEAT_SECONDS
+    assert collector.heartbeat(conn, last_values, online, now) == 1
+    assert collector.heartbeat(conn, last_values, online, now) == 0
+    assert storage.series(conn, "dev1", "power", 0) == [(now, 42.0)]
+
+
+def test_record_populates_last_values_so_a_push_resets_the_clock(conn):
+    last_values = {}
+    collector.record(conn, "dev1", {"cur_power": 909}, SCALES, 100, last_values)
+    assert last_values[("dev1", "power")] == [100, 90.9]
+
+    online = {"dev1": True}
+    # Not yet stale relative to the push's own timestamp.
+    assert collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_SECONDS - 1) == 0
+    # Stale now.
+    assert collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_SECONDS) == 1
+    assert storage.series(conn, "dev1", "power", 0) == [
+        (100, 90.9),
+        (100 + collector.HEARTBEAT_SECONDS, 90.9),
+    ]
+
+
 def test_push_listener_writes_from_the_mqtt_callback_thread(tmp_path):
     """
     Reproduces the real bug: paho-mqtt calls update_device() on its own
@@ -215,12 +282,12 @@ def test_run_builds_exactly_one_tuya_session(monkeypatch, tmp_path):
 
     monkeypatch.setattr(collector.roles, "classify", fake_classify)
 
-    def fake_start_push(manager, database, scales):
+    def fake_start_push(manager, database, scales, last_values=None):
         start_push_calls.append(manager)
 
     monkeypatch.setattr(collector, "start_push", fake_start_push)
 
-    def fake_poll_once(api, conn, device_ids, scales, seen=None):
+    def fake_poll_once(api, conn, device_ids, scales, seen=None, last_values=None):
         poll_once_calls.append(api)
 
     monkeypatch.setattr(collector, "poll_once", fake_poll_once)
