@@ -15,6 +15,11 @@ PlasmoidItem {
     property var batteries: [0, 0, 0]
     property var deviceIds: ["", "", ""]
     property var socketsData: []
+    // Today's consumption per socket, keyed by device id: kWh so far, or
+    // null when the server has nothing recorded for that device yet. Not
+    // merged into socketsData because it comes from its own slow (300s)
+    // timer, separate from the 7-second socket poll.
+    property var socketEnergy: ({})
     property string thermometerUpdate: ""
     property string socketUpdate: ""
     
@@ -23,7 +28,7 @@ PlasmoidItem {
     property string chartDeviceName: ""
     property string chartKind: "socket"     // "socket" or "sensor"
     property var chartSeries: []
-    property var chartSummary: null
+    property var chartSummaries: ({})
     property int chartPeriod: 1
     property bool chartVisible: false
     property string chartSource: "server"
@@ -63,6 +68,17 @@ PlasmoidItem {
         if (v === undefined || v === null || isNaN(v)) return "-"
         return Math.abs(v - Math.round(v)) < 0.05
                ? String(Math.round(v)) : v.toFixed(1)
+    }
+
+    // Today's consumption for a socket card. Three distinct states, not two:
+    // no id to look up yet (nothing has arrived from the energy timer for
+    // this device) and "arrived, and the server has nothing" both render as
+    // an absence -- but 0.0 kWh (a real, if idle, reading) must never be
+    // confused with either. Never returns "0.00" for a null/missing value.
+    function formatEnergyKwh(id) {
+        if (!id || !(id in socketEnergy)) return ""
+        var kwh = socketEnergy[id]
+        return (kwh === null || kwh === undefined) ? "—" : kwh.toFixed(2) + " кВт·ч"
     }
 
     function getBatteryColor(level) {
@@ -106,10 +122,17 @@ PlasmoidItem {
                         socketsData = result.sockets
                         socketUpdate = now
                     }
+                    if (result.energy !== undefined) {
+                        // Keyed by device id, value is today's kWh so far or
+                        // null when the server has no rows for that device --
+                        // the two must stay visually distinct (see
+                        // formatEnergyKwh), never both rendered as "0.00".
+                        socketEnergy = result.energy
+                    }
                     if (result.series !== undefined) {
                         if (!result.device || result.device === chartDeviceId) {
                             chartSource = result.source || "server"
-                            chartSummary = result.summary || null
+                            chartSummaries = result.summaries || {}
                             var built = []
                             // Units are spelled the same here, on the axis,
                             // in the legend and in the summary row: one panel
@@ -157,7 +180,32 @@ PlasmoidItem {
         cmd += " #" + Date.now()
         executable.connectSource(cmd)
     }
-    
+
+    function updateEnergy() {
+        // socketsData is empty until the first socket poll lands, and a
+        // shell command built with an empty positional loses that argument
+        // to word splitting -- every argument after it then shifts left and
+        // is misread by tuya_client.py (this has already cost one fix
+        // round). Skip the request entirely rather than send that.
+        var ids = []
+        for (var i = 0; i < socketsData.length; i++) {
+            if (socketsData[i] && socketsData[i].id) {
+                ids.push(socketsData[i].id)
+            }
+        }
+        if (ids.length === 0) {
+            return
+        }
+        var cmd = "/home/charoyan/projects/tuya/venv/bin/python3 "
+                + "/home/charoyan/projects/tuya/tuya_client.py energy "
+                + ids.join(",")
+        if (Plasmoid.configuration.enableLogging) {
+            cmd += " --log"
+        }
+        cmd += " #" + Date.now()
+        executable.connectSource(cmd)
+    }
+
     function loadChartData() {
         // The axis shows the period that was asked for, whatever comes back.
         var nowSec = Math.floor(Date.now() / 1000)
@@ -166,7 +214,7 @@ PlasmoidItem {
 
         if (!chartDeviceId) {
             chartSeries = []
-            chartSummary = null
+            chartSummaries = {}
             // No request went out, so nothing is known about the server:
             // "нет данных" rather than "сервер недоступен".
             chartSource = "empty"
@@ -197,7 +245,19 @@ PlasmoidItem {
         triggeredOnStart: true
         onTriggered: updateSockets()
     }
-    
+
+    // Today's consumption is a whole day's integral: it does not move
+    // meaningfully minute to minute, so it gets its own slow timer rather
+    // than riding along on the 7-second socket poll above.
+    Timer {
+        id: energyTimer
+        interval: 300000
+        running: true
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: updateEnergy()
+    }
+
     fullRepresentation: Item {
         Layout.preferredWidth: Kirigami.Units.gridUnit * 42
         Layout.preferredHeight: Kirigami.Units.gridUnit * 15
@@ -304,8 +364,22 @@ PlasmoidItem {
                                         opacity: 0.6
                                         Layout.fillWidth: true
                                     }
+
+                                    // Today's consumption, integrated server-side
+                                    // from local midnight. Hidden rather than
+                                    // "0.00" when nothing has arrived yet or the
+                                    // server has no rows for this device -- see
+                                    // formatEnergyKwh.
+                                    PlasmaComponents.Label {
+                                        text: "⚡ " + root.formatEnergyKwh(socketsData[index].id)
+                                        font.pixelSize: 9
+                                        color: root.getSocketColors(index).text
+                                        opacity: 0.55
+                                        Layout.fillWidth: true
+                                        visible: root.formatEnergyKwh(socketsData[index].id) !== ""
+                                    }
                                 }
-                                
+
                                 // Click to show chart
                                 MouseArea {
                                     anchors.fill: parent
@@ -318,7 +392,7 @@ PlasmoidItem {
                                         // so an hour is already a full curve.
                                         root.chartPeriod = 1
                                         root.chartSeries = []
-                                        root.chartSummary = null
+                                        root.chartSummaries = {}
                                         root.chartSource = "server"
                                         root.chartVisible = true
                                         root.loadChartData()
@@ -328,7 +402,7 @@ PlasmoidItem {
                         }
                     }
                 }
-                
+
                 // Separator
                 Rectangle {
                     Layout.preferredWidth: 1
@@ -497,7 +571,7 @@ PlasmoidItem {
                                     // the shortest period that shows a curve.
                                     root.chartPeriod = 24
                                     root.chartSeries = []
-                                    root.chartSummary = null
+                                    root.chartSummaries = {}
                                     root.chartSource = "server"
                                     root.chartVisible = true
                                     root.loadChartData()
@@ -665,7 +739,7 @@ PlasmoidItem {
                                     onClicked: {
                                         chartPeriod = modelData.hours
                                         chartSeries = []
-                                        chartSummary = null
+                                        chartSummaries = {}
                                         // Otherwise the amber "локальные
                                         // данные" banner from the last
                                         // period hangs over the empty
@@ -697,15 +771,15 @@ PlasmoidItem {
                         Layout.fillWidth: true
                         Layout.topMargin: 8
                         Layout.bottomMargin: 2
-                        visible: root.chartKind === "socket" && root.chartSummary !== null
+                        visible: root.chartKind === "socket" && root.chartSummaries.power !== undefined
                         spacing: 10
 
                         Repeater {
-                            model: root.chartSummary ? [
-                                {k: "мин", v: root.chartSummary.min.toFixed(0) + " Вт"},
-                                {k: "сред", v: root.chartSummary.avg.toFixed(0) + " Вт"},
-                                {k: "макс", v: root.chartSummary.max.toFixed(0) + " Вт"},
-                                {k: "расход", v: root.chartSummary.kwh.toFixed(2) + " кВт·ч"}
+                            model: root.chartSummaries.power ? [
+                                {k: "мин", v: root.chartSummaries.power.min.toFixed(0) + " Вт", c: "#e8eaf0"},
+                                {k: "сред", v: root.chartSummaries.power.avg.toFixed(0) + " Вт", c: "#e8eaf0"},
+                                {k: "макс", v: root.chartSummaries.power.max.toFixed(0) + " Вт", c: "#e8eaf0"},
+                                {k: "расход", v: root.chartSummaries.power.kwh.toFixed(2) + " кВт·ч", c: "#e8eaf0"}
                             ] : []
 
                             // Each cell is an Item that fills its share of the row
@@ -731,7 +805,85 @@ PlasmoidItem {
                                         text: modelData.v
                                         font.pixelSize: 10
                                         font.bold: true
-                                        color: "#e8eaf0"
+                                        color: modelData.c
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Sensor summary: min/avg/max for temperature and for
+                    // humidity, one row per metric that actually has data,
+                    // each labelled and coloured to match its series (same
+                    // colours as the chart legend/axis above). kwh is never
+                    // shown here -- it is null by design for both metrics,
+                    // integrating a temperature or a humidity curve is
+                    // meaningless.
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.topMargin: 8
+                        Layout.bottomMargin: 2
+                        visible: root.chartKind === "sensor"
+                                 && (root.chartSummaries.temperature !== undefined
+                                     || root.chartSummaries.humidity !== undefined)
+                        spacing: 4
+
+                        Repeater {
+                            model: {
+                                var groups = []
+                                if (root.chartSummaries.temperature !== undefined) {
+                                    var t = root.chartSummaries.temperature
+                                    groups.push([
+                                        {k: "мин", v: t.min.toFixed(1) + "°C", c: "#fbbf24"},
+                                        {k: "сред", v: t.avg.toFixed(1) + "°C", c: "#fbbf24"},
+                                        {k: "макс", v: t.max.toFixed(1) + "°C", c: "#fbbf24"}
+                                    ])
+                                }
+                                if (root.chartSummaries.humidity !== undefined) {
+                                    var h = root.chartSummaries.humidity
+                                    groups.push([
+                                        {k: "мин", v: h.min.toFixed(0) + "%", c: "#38bdf8"},
+                                        {k: "сред", v: h.avg.toFixed(0) + "%", c: "#38bdf8"},
+                                        {k: "макс", v: h.max.toFixed(0) + "%", c: "#38bdf8"}
+                                    ])
+                                }
+                                return groups
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 10
+
+                                Repeater {
+                                    model: modelData
+
+                                    // Same layout approach as the socket summary
+                                    // row above: an Item with Layout.fillWidth
+                                    // and the label/value pair centred inside it,
+                                    // not fillWidth on the pair itself -- that
+                                    // packs the labels left and runs values into
+                                    // the next label.
+                                    Item {
+                                        Layout.fillWidth: true
+                                        implicitHeight: sensorCell.implicitHeight
+
+                                        Row {
+                                            id: sensorCell
+                                            anchors.centerIn: parent
+                                            spacing: 5
+
+                                            PlasmaComponents.Label {
+                                                text: modelData.k
+                                                font.pixelSize: 10
+                                                color: Qt.rgba(1, 1, 1, 0.45)
+                                            }
+                                            PlasmaComponents.Label {
+                                                text: modelData.v
+                                                font.pixelSize: 10
+                                                font.bold: true
+                                                color: modelData.c
+                                            }
+                                        }
                                     }
                                 }
                             }
