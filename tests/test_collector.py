@@ -1,6 +1,7 @@
 import threading
 
 import pytest
+import tuya_sharing_api
 from server import collector, storage
 
 SCALES = {"cur_power": 1, "cur_voltage": 1, "add_ele": 3, "temp_current": 1}
@@ -143,3 +144,103 @@ def test_push_listener_writes_from_the_mqtt_callback_thread(tmp_path):
     rows = storage.series(conn, "dev1", "power", 0)
     assert len(rows) == 1
     assert rows[0][1] == 90.9
+
+
+class _LoopBroken(Exception):
+    """Raised by the stubbed time.sleep to escape run()'s infinite loop."""
+
+
+FAKE_SESSION = {
+    "user_code": "user1",
+    "terminal_id": "term1",
+    "endpoint": "https://example.com",
+    "token_info": {
+        "t": 1, "uid": "u1", "expire_time": 1,
+        "access_token": "a", "refresh_token": "r",
+    },
+}
+
+
+def test_run_builds_exactly_one_tuya_session(monkeypatch, tmp_path):
+    """
+    Regression test for the collector's most serious bug: run() used to build
+    a second, independent CustomerApi via tuya_sharing_api.get_api() on top of
+    the one already inside Manager. Both sign requests with the current
+    refresh token, so the first rotation orphaned one of them and the SDK
+    swallowed the failure -- MQTT push died permanently about two hours after
+    every start while the service still looked alive.
+
+    tuya_sharing_api.get_api is patched to raise if it is ever called, which
+    asserts against the real run() code rather than a mock standing in for
+    it. classify() and poll_once() are patched only to record which `api`
+    object they were handed; the fix is confirmed by checking that object
+    `is` manager.customer_api, not some second instance.
+    """
+    order = []
+    get_api_calls = []
+    classify_calls = []
+    poll_once_calls = []
+    start_push_calls = []
+    manager_holder = {}
+
+    monkeypatch.setattr(tuya_sharing_api, "load_session", lambda: FAKE_SESSION)
+
+    def fake_prefer_ipv4():
+        order.append("prefer_ipv4")
+
+    monkeypatch.setattr(tuya_sharing_api, "prefer_ipv4", fake_prefer_ipv4)
+
+    def fake_get_api(*args, **kwargs):
+        get_api_calls.append(1)
+        raise AssertionError("second session")
+
+    monkeypatch.setattr(tuya_sharing_api, "get_api", fake_get_api)
+
+    class _FakeManager:
+        def __init__(self, client_id, user_code, terminal_id, endpoint, token_info, token_listener):
+            order.append("manager_init")
+            self.customer_api = object()
+            self.user_homes = []
+            self.device_map = {}
+            manager_holder["instance"] = self
+
+        def update_device_cache(self):
+            pass
+
+    monkeypatch.setattr(collector, "Manager", _FakeManager)
+
+    def fake_classify(api, device_ids):
+        classify_calls.append(api)
+        return list(device_ids), list(device_ids), {d: {} for d in device_ids}
+
+    monkeypatch.setattr(collector.roles, "classify", fake_classify)
+
+    def fake_start_push(manager, database, scales):
+        start_push_calls.append(manager)
+
+    monkeypatch.setattr(collector, "start_push", fake_start_push)
+
+    def fake_poll_once(api, conn, device_ids, scales, seen=None):
+        poll_once_calls.append(api)
+
+    monkeypatch.setattr(collector, "poll_once", fake_poll_once)
+
+    def fake_sleep(seconds):
+        raise _LoopBroken()
+
+    monkeypatch.setattr(collector.time, "sleep", fake_sleep)
+
+    settings_dict = {
+        "server": {"database": str(tmp_path / "collector.db"), "poll_interval": 5},
+    }
+
+    with pytest.raises(_LoopBroken):
+        collector.run(settings_dict, ["dev1"])
+
+    assert get_api_calls == []  # the second session was never built
+    manager = manager_holder["instance"]
+    assert classify_calls == [manager.customer_api]
+    assert poll_once_calls == [manager.customer_api]
+    assert start_push_calls == [manager]
+    # prefer_ipv4() must run before the network session (Manager) is built.
+    assert order == ["prefer_ipv4", "manager_init"]

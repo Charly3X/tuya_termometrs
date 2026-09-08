@@ -172,6 +172,9 @@ def run(settings_dict, device_ids):
     # mark and push would stop permanently, while shadow polling kept
     # working: a service that looks alive, so Restart=always never fires.
     # Everything that talks to Tuya goes through manager.customer_api.
+    # tests/test_collector.py::test_run_builds_exactly_one_tuya_session
+    # enforces this: it fails tuya_sharing_api.get_api() outright and checks
+    # that classify()/poll_once() are handed manager.customer_api.
     manager = Manager(
         tuya_sharing_api.CLIENT_ID,
         session["user_code"],
