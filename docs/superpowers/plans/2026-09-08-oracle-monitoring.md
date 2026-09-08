@@ -1384,6 +1384,26 @@ git commit -m "Add collector service using MQTT push and shadow polling"
 - Consumes: `storage.power_series`, `storage.series`.
 - Produces: `api.make_handler(conn, token) -> class` and `api.serve(conn, token, port) -> None`.
 
+> **The code below is the original plan and is known to be defective. The
+> committed `server/api.py` is authoritative.** Three faults were found by
+> running it, all fixed during execution:
+> 1. It shares one sqlite3 connection across `ThreadingHTTPServer`'s
+>    per-request threads, which sqlite3 forbids — the same cross-thread
+>    mistake as the collector in Task 6. The implementation opens a
+>    short-lived connection per request instead.
+> 2. `_authorised` lets `Authorization: Bearer ` through when the configured
+>    token is empty, because `compare_digest("", "")` is true. The
+>    implementation refuses to construct the handler at all on a falsy token.
+> 3. `int(hours)` on untrusted input kills the handler thread. The
+>    implementation rejects non-numeric, non-positive and non-finite values
+>    with 400, and clamps a `since` that would overflow SQLite's 64-bit
+>    integer column. Note that `float()` accepts `"nan"` and `"inf"`, which
+>    is how the second round of this fix was needed.
+>
+> The two "return everything" tests below also cannot pass as written:
+> `hours=99999` reaches back about eleven years, while the fixture
+> timestamps sit near the Unix epoch.
+
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_api.py`:
