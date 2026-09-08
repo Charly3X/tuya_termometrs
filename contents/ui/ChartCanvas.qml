@@ -3,12 +3,24 @@ import QtQuick
 Item {
     id: chart
 
-    // Each entry: {points: [[ts, value], ...], color, unit, axis, label}
+    // Each entry: {points: [[ts, value], ...], color, unit, axis, label,
+    //              floorAtZero}
+    // floorAtZero is optional and marks a quantity that cannot go below zero,
+    // so the padded axis is not allowed to invent negative watts.
     property var series: []
     property string emptyText: "Нет данных"
 
+    // The period the user asked for, in epoch seconds. When set, the time
+    // axis spans this instead of the first and last sample: with two samples
+    // an hour apart, a 24-hour selection must not draw a full-width line and
+    // label it as one hour.
+    property real windowStart: 0
+    property real windowEnd: 0
+
     function repaint() { canvas.requestPaint() }
     onSeriesChanged: canvas.requestPaint()
+    onWindowStartChanged: canvas.requestPaint()
+    onWindowEndChanged: canvas.requestPaint()
 
     // Cursor position for the hover readout, -1 when the mouse is away
     property real cursorX: -1
@@ -33,7 +45,9 @@ Item {
 
     function _bounds(list) {
         var lo = Infinity, hi = -Infinity
+        var floorZero = list.length > 0
         for (var s = 0; s < list.length; s++) {
+            if (!list[s].floorAtZero) floorZero = false
             var pts = list[s].points
             if (!pts) continue
             for (var i = 0; i < pts.length; i++) {
@@ -44,7 +58,20 @@ Item {
         if (lo === Infinity) return [0, 1]
         var pad = (hi - lo) * 0.12
         if (pad < 0.5) pad = 0.5
-        return [lo - pad, hi + pad]
+        var bottom = lo - pad
+        // A plug reading 0 W would otherwise get a "-11 W" bottom label.
+        // Only for quantities that declared themselves non-negative, and only
+        // when the data itself stays non-negative -- temperature keeps its
+        // padding below zero, because -3 °C is a real reading.
+        if (floorZero && lo >= 0 && bottom < 0) bottom = 0
+        return [bottom, hi + pad]
+    }
+
+    // How many decimals an axis label needs. Temperature moves less than a
+    // degree in a typical window, so a whole-number axis prints
+    // "26 26 26 25 25" -- five labels carrying no information.
+    function _decimals(range) {
+        return range < 5 ? 1 : 0
     }
 
     function _timeSpan() {
@@ -55,22 +82,49 @@ Item {
             if (pts[0][0] < lo) lo = pts[0][0]
             if (pts[pts.length - 1][0] > hi) hi = pts[pts.length - 1][0]
         }
-        if (lo === Infinity) return [0, 1]
+        var haveData = lo !== Infinity
+
+        if (windowEnd > windowStart) {
+            var wlo = windowStart, whi = windowEnd
+            // Widen for data outside the requested window rather than
+            // clipping it: the desktop and the collector do not share a
+            // clock, and a sample a few seconds "in the future" must not be
+            // painted outside the plot area.
+            if (haveData) {
+                if (lo < wlo) wlo = lo
+                if (hi > whi) whi = hi
+            }
+            return [wlo, whi]
+        }
+
+        if (!haveData) return [0, 1]
         if (hi - lo < 1) hi = lo + 1
         return [lo, hi]
     }
 
+    // One point is data. Sensors record only when the value changes, roughly
+    // once an hour, so a one-hour sensor window holds exactly one sample --
+    // requiring two here is what made the sensor chart open on "Нет данных".
     function _hasData() {
         for (var s = 0; s < series.length; s++)
-            if (series[s].points && series[s].points.length > 1) return true
+            if (series[s].points && series[s].points.length > 0) return true
         return false
+    }
+
+    // The series an axis takes its colour and unit from: the first one that
+    // actually has points.
+    function _axisRef(list) {
+        for (var s = 0; s < list.length; s++)
+            if (list[s].points && list[s].points.length) return list[s]
+        return null
     }
 
     Canvas {
         id: canvas
         anchors.fill: parent
-        readonly property int padL: 42
-        readonly property int padR: 42
+        // Room for a label like "102 Вт" or "26.1°C" at 9px.
+        readonly property int padL: 50
+        readonly property int padR: 50
         readonly property int padT: 12
         readonly property int padB: 24
 
@@ -93,8 +147,15 @@ Item {
             for (var s = 0; s < chart.series.length; s++)
                 (chart.series[s].axis === "right" ? right : left).push(chart.series[s])
 
+            // An axis whose series carry no points has nothing to scale, and
+            // printing its default [0, 1] beside a real curve reads as data.
+            var lref = chart._axisRef(left)
+            var rref = chart._axisRef(right)
+
             var lb = chart._bounds(left)
             var rb = right.length ? chart._bounds(right) : [0, 1]
+            var lDec = chart._decimals(lb[1] - lb[0])
+            var rDec = chart._decimals(rb[1] - rb[0])
             var span = chart._timeSpan()
             var tRange = span[1] - span[0]
 
@@ -106,16 +167,16 @@ Item {
                 var gy = padT + ch * g / 4
                 ctx.beginPath(); ctx.moveTo(padL, gy); ctx.lineTo(padL + cw, gy); ctx.stroke()
 
-                if (left.length) {
-                    ctx.fillStyle = left[0].color
+                if (lref) {
+                    ctx.fillStyle = lref.color
                     ctx.textAlign = "right"
-                    ctx.fillText((lb[1] - (lb[1] - lb[0]) * g / 4).toFixed(0) + left[0].unit,
+                    ctx.fillText((lb[1] - (lb[1] - lb[0]) * g / 4).toFixed(lDec) + lref.unit,
                                  padL - 5, gy + 3)
                 }
-                if (right.length) {
-                    ctx.fillStyle = right[0].color
+                if (rref) {
+                    ctx.fillStyle = rref.color
                     ctx.textAlign = "left"
-                    ctx.fillText((rb[1] - (rb[1] - rb[0]) * g / 4).toFixed(0) + right[0].unit,
+                    ctx.fillText((rb[1] - (rb[1] - rb[0]) * g / 4).toFixed(rDec) + rref.unit,
                                  padL + cw + 5, gy + 3)
                 }
             }
@@ -133,40 +194,52 @@ Item {
             for (var si = 0; si < chart.series.length; si++) {
                 var ser = chart.series[si]
                 var pts = ser.points
-                if (!pts || pts.length < 2) continue
+                if (!pts || !pts.length) continue
                 var b = ser.axis === "right" ? rb : lb
                 var vRange = b[1] - b[0]
                 var primary = si === 0
 
-                function px(i) { return padL + ((pts[i][0] - span[0]) / tRange) * cw }
-                function py(i) { return padT + ch - ((pts[i][1] - b[0]) / vRange) * ch }
+                // Assigned rather than declared: a function declaration inside
+                // a loop body is a grey area, and these close over pts/b/span
+                // that the next iteration reassigns.
+                var px = function (i) {
+                    return padL + ((pts[i][0] - span[0]) / tRange) * cw
+                }
+                var py = function (i) {
+                    return padT + ch - ((pts[i][1] - b[0]) / vRange) * ch
+                }
 
-                if (primary) {
-                    ctx.beginPath()
-                    for (var f = 0; f < pts.length; f++) {
-                        if (f === 0) ctx.moveTo(px(f), py(f)); else ctx.lineTo(px(f), py(f))
+                // One sample is a dot, not a line: a zero-length path would
+                // fill a triangle down to the baseline and stroke nothing.
+                if (pts.length > 1) {
+                    if (primary) {
+                        ctx.beginPath()
+                        for (var f = 0; f < pts.length; f++) {
+                            if (f === 0) ctx.moveTo(px(f), py(f)); else ctx.lineTo(px(f), py(f))
+                        }
+                        ctx.lineTo(px(pts.length - 1), padT + ch)
+                        ctx.lineTo(px(0), padT + ch)
+                        ctx.closePath()
+                        var grad = ctx.createLinearGradient(0, padT, 0, padT + ch)
+                        grad.addColorStop(0, chart._withAlpha(ser.color, 0.28))
+                        grad.addColorStop(1, chart._withAlpha(ser.color, 0.0))
+                        ctx.fillStyle = grad
+                        ctx.fill()
                     }
-                    ctx.lineTo(padL + cw, padT + ch)
-                    ctx.lineTo(padL, padT + ch)
-                    ctx.closePath()
-                    var grad = ctx.createLinearGradient(0, padT, 0, padT + ch)
-                    grad.addColorStop(0, chart._withAlpha(ser.color, 0.28))
-                    grad.addColorStop(1, chart._withAlpha(ser.color, 0.0))
-                    ctx.fillStyle = grad
-                    ctx.fill()
+
+                    ctx.beginPath()
+                    for (var l = 0; l < pts.length; l++) {
+                        if (l === 0) ctx.moveTo(px(l), py(l)); else ctx.lineTo(px(l), py(l))
+                    }
+                    ctx.strokeStyle = ser.color
+                    ctx.lineWidth = primary ? 2.0 : 1.5
+                    ctx.lineJoin = "round"
+                    ctx.stroke()
                 }
 
                 ctx.beginPath()
-                for (var l = 0; l < pts.length; l++) {
-                    if (l === 0) ctx.moveTo(px(l), py(l)); else ctx.lineTo(px(l), py(l))
-                }
-                ctx.strokeStyle = ser.color
-                ctx.lineWidth = primary ? 2.0 : 1.5
-                ctx.lineJoin = "round"
-                ctx.stroke()
-
-                ctx.beginPath()
-                ctx.arc(px(pts.length - 1), py(pts.length - 1), 3, 0, Math.PI * 2)
+                ctx.arc(px(pts.length - 1), py(pts.length - 1),
+                        pts.length > 1 ? 3 : 4, 0, Math.PI * 2)
                 ctx.fillStyle = ser.color
                 ctx.fill()
             }
