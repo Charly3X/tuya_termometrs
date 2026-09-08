@@ -13,7 +13,6 @@ from tuya_local import (
 from tuya_history import add_readings
 import tuya_sharing_api
 import history_client
-import chart_data
 from settings import load_settings
 
 CONFIG_FILE = Path(__file__).parent / "config.json"
@@ -438,8 +437,11 @@ if __name__ == "__main__":
         except ValueError:
             hours = 0
         if not device_id or hours <= 0:
+            # No request was made, so the server's health is unknown: "empty"
+            # makes the widget say "нет данных" instead of blaming a machine
+            # nobody asked.
             print(json.dumps({"series": {}, "device": device_id,
-                              "source": "unavailable", "summary": None}))
+                              "source": "empty", "summary": None}))
             sys.exit(0)
         metrics = (args[3] if len(args) > 3 else "power").split(",")
         app_settings = load_settings()

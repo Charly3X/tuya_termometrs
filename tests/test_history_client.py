@@ -96,8 +96,31 @@ def test_empty_server_answer_is_treated_as_no_data(local_rows, monkeypatch):
     assert source == "local"
 
 
-def test_empty_everywhere_reports_unavailable(monkeypatch):
+def test_server_answered_with_nothing_reports_empty(monkeypatch):
+    """
+    The collector answered, it just has not recorded this device yet. Saying
+    "unavailable" here would send the user to debug a server that is alive,
+    and the spec's own fallback table ends a plug with no data anywhere at
+    "нет данных", not at "сервер недоступен".
+    """
     monkeypatch.setattr(history_client, "fetch_series", lambda *a, **k: [])
+    monkeypatch.setattr(history_client, "local_power", lambda d, h: [])
+    series, source, summary = history_client.get_series(
+        {"history_server": "http://example", "history_timeout": 3},
+        "tok", "dev", 1, ["power"],
+    )
+    assert series == {}
+    assert source == "empty"
+    assert summary is None
+
+
+def test_unreachable_server_reports_unavailable(monkeypatch):
+    """
+    The other half of the pair: fetch_series returns None only when the
+    request itself failed, and that is the one case worth naming the server
+    for.
+    """
+    monkeypatch.setattr(history_client, "fetch_series", lambda *a, **k: None)
     monkeypatch.setattr(history_client, "local_power", lambda d, h: [])
     series, source, summary = history_client.get_series(
         {"history_server": "http://example", "history_timeout": 3},
@@ -106,6 +129,15 @@ def test_empty_everywhere_reports_unavailable(monkeypatch):
     assert series == {}
     assert source == "unavailable"
     assert summary is None
+
+
+def test_no_server_configured_and_no_local_data_is_unavailable(monkeypatch):
+    """An unconfigured server is still a server the widget cannot reach."""
+    monkeypatch.setattr(history_client, "local_power", lambda d, h: [])
+    _, source, _ = history_client.get_series(
+        {"history_server": "", "history_timeout": 3}, "tok", "dev", 1, ["power"],
+    )
+    assert source == "unavailable"
 
 
 def test_series_are_downsampled(monkeypatch):

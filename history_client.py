@@ -48,10 +48,16 @@ def get_series(settings_dict, token, device_id, hours, metrics):
     (series, source, summary).
 
     series maps metric name to [[ts, value], ...], already downsampled for
-    drawing. source is "server", "local" or "unavailable", and is returned so
-    the widget can say which one it drew rather than silently showing gappy
-    local data that looks complete. summary is the power statistics, or None
-    when power was not among the metrics.
+    drawing. source is "server", "local", "unavailable" or "empty", and is
+    returned so the widget can say which one it drew rather than silently
+    showing gappy local data that looks complete. summary is the power
+    statistics, or None when power was not among the metrics.
+
+    "unavailable" and "empty" are kept apart on purpose. A request that never
+    got an answer means the collector is down and the widget should say so.
+    A request answered with [] means the collector is alive and simply has
+    nothing recorded for this device yet -- announcing a dead server then
+    would send the user debugging a machine that is fine.
 
     The summary is computed from the RAW rows, before downsampling, and that
     ordering is load-bearing. Downsampling keeps each bucket's minimum and
@@ -62,11 +68,18 @@ def get_series(settings_dict, token, device_id, hours, metrics):
     base_url = settings_dict.get("history_server") or ""
     timeout = settings_dict.get("history_timeout", 3)
 
+    # No server configured is a server we cannot reach, not a server with
+    # nothing to say.
+    unreachable = not base_url
+
     if base_url:
         series = {}
         summary = None
         for metric in metrics:
             rows = fetch_series(base_url, token, device_id, hours, metric, timeout)
+            if rows is None:
+                unreachable = True
+                continue
             if rows:
                 if metric == "power":
                     summary = chart_data.summarise_power(rows)
@@ -84,4 +97,4 @@ def get_series(settings_dict, token, device_id, hours, metrics):
                 chart_data.summarise_power(rows),
             )
 
-    return {}, "unavailable", None
+    return {}, ("unavailable" if unreachable else "empty"), None
