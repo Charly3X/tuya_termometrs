@@ -234,6 +234,7 @@ def get_sharing_temperatures(config, log_func=None):
         "humidity": humids,
         "names": names,
         "batteries": batteries,
+        "ids": list(devices) + [""] * (3 - len(devices)),
     }
 
 

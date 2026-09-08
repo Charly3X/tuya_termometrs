@@ -13,6 +13,7 @@ PlasmoidItem {
     property var humidity: ["-", "-", "-"]
     property var deviceNames: ["Loading...", "Loading...", "Loading..."]
     property var batteries: [0, 0, 0]
+    property var deviceIds: ["", "", ""]
     property var socketsData: []
     property string thermometerUpdate: ""
     property string socketUpdate: ""
@@ -20,10 +21,12 @@ PlasmoidItem {
     // Chart properties
     property string chartDeviceId: ""
     property string chartDeviceName: ""
-    property var chartData: []
-    property string chartSource: "server"
+    property string chartKind: "socket"     // "socket" or "sensor"
+    property var chartSeries: []
+    property var chartSummary: null
     property int chartPeriod: 1
     property bool chartVisible: false
+    property string chartSource: "server"
     
     preferredRepresentation: fullRepresentation
     
@@ -79,6 +82,7 @@ PlasmoidItem {
                         humidity = result.humidity
                         deviceNames = result.names
                         batteries = result.batteries
+                        deviceIds = result.ids || ["", "", ""]
                         thermometerUpdate = now
                     }
                     if (result.socket) {
@@ -89,12 +93,24 @@ PlasmoidItem {
                         socketsData = result.sockets
                         socketUpdate = now
                     }
-                    if (result.history !== undefined) {
-                        // Only update chart if data is for the currently selected device
-                        if (!result.history_device || result.history_device === chartDeviceId) {
-                            chartData = result.history
-                            chartSource = result.history_source || "server"
-                            chartCanvas.requestPaint()
+                    if (result.series !== undefined) {
+                        if (!result.device || result.device === chartDeviceId) {
+                            chartSource = result.source || "server"
+                            chartSummary = result.summary || null
+                            var built = []
+                            if (chartKind === "socket") {
+                                built.push({points: result.series.power || [],
+                                            color: "#10b981", unit: "W",
+                                            axis: "left", label: "Мощность"})
+                            } else {
+                                built.push({points: result.series.temperature || [],
+                                            color: "#fbbf24", unit: "°",
+                                            axis: "left", label: "Температура"})
+                                built.push({points: result.series.humidity || [],
+                                            color: "#38bdf8", unit: "%",
+                                            axis: "right", label: "Влажность"})
+                            }
+                            chartSeries = built
                         }
                     }
                 } catch(e) {
@@ -124,8 +140,10 @@ PlasmoidItem {
     }
     
     function loadChartData() {
-        console.log("CHART: Loading data for device:", chartDeviceId, "period:", chartPeriod)
-        var cmd = "/home/charoyan/projects/tuya/venv/bin/python3 /home/charoyan/projects/tuya/tuya_client.py history " + chartDeviceId + " " + chartPeriod
+        var metrics = chartKind === "socket" ? "power" : "temperature,humidity"
+        var cmd = "/home/charoyan/projects/tuya/venv/bin/python3 "
+                + "/home/charoyan/projects/tuya/tuya_client.py series "
+                + chartDeviceId + " " + chartPeriod + " " + metrics
         cmd += " #" + Date.now()
         executable.connectSource(cmd)
     }
@@ -263,9 +281,10 @@ PlasmoidItem {
                                     onClicked: {
                                         root.chartDeviceId = socketsData[index].id
                                         root.chartDeviceName = socketsData[index].name
+                                        root.chartKind = "socket"
                                         root.chartPeriod = 1
-                                        root.chartData = []
-                                        chartCanvas.requestPaint()
+                                        root.chartSeries = []
+                                        root.chartSummary = null
                                         root.chartVisible = true
                                         root.loadChartData()
                                     }
@@ -428,9 +447,24 @@ PlasmoidItem {
                                     }
                                 }
                             }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    root.chartDeviceId = root.deviceIds[index] || ""
+                                    root.chartDeviceName = deviceNames[index]
+                                    root.chartKind = "sensor"
+                                    root.chartPeriod = 1
+                                    root.chartSeries = []
+                                    root.chartSummary = null
+                                    root.chartVisible = true
+                                    root.loadChartData()
+                                }
+                            }
                         }
                     }
-                    
+
                     // Update timestamps
                     RowLayout {
                         Layout.fillWidth: true
@@ -549,8 +583,9 @@ PlasmoidItem {
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: {
                                             chartPeriod = modelData.hours
-                                            chartData = []
-                                            chartCanvas.requestPaint()
+                                            chartSeries = []
+                                            chartSummary = null
+                                            chartCanvas.repaint()
                                             loadChartData()
                                         }
                                     }
@@ -558,149 +593,41 @@ PlasmoidItem {
                             }
                         }
                         
-                        // Chart canvas
-                        Canvas {
+                        ChartCanvas {
                             id: chartCanvas
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            
-                            onPaint: {
-                                var ctx = getContext("2d")
-                                var w = width
-                                var h = height
-                                ctx.clearRect(0, 0, w, h)
-                                
-                                if (!chartData || chartData.length < 2) {
-                                    ctx.fillStyle = Qt.rgba(1, 1, 1, 0.3)
-                                    ctx.font = "14px sans-serif"
-                                    ctx.textAlign = "center"
-                                    ctx.fillText("Нет данных", w / 2, h / 2)
-                                    return
-                                }
-                                
-                                var padL = 45, padR = 10, padT = 10, padB = 25
-                                var cw = w - padL - padR
-                                var ch = h - padT - padB
-                                
-                                // Find min/max power
-                                var minP = Infinity, maxP = -Infinity
-                                for (var i = 0; i < chartData.length; i++) {
-                                    var p = chartData[i][1]
-                                    if (p < minP) minP = p
-                                    if (p > maxP) maxP = p
-                                }
-                                
-                                // Add padding to range
-                                var range = maxP - minP
-                                if (range < 1) range = 1
-                                minP = Math.max(0, minP - range * 0.1)
-                                maxP = maxP + range * 0.1
-                                range = maxP - minP
-                                
-                                var tMin = chartData[0][0]
-                                var tMax = chartData[chartData.length - 1][0]
-                                var tRange = tMax - tMin
-                                if (tRange < 1) tRange = 1
-                                
-                                // Grid lines
-                                ctx.strokeStyle = Qt.rgba(1, 1, 1, 0.06)
-                                ctx.lineWidth = 1
-                                var gridLines = 4
-                                for (var gi = 0; gi <= gridLines; gi++) {
-                                    var gy = padT + ch * gi / gridLines
-                                    ctx.beginPath()
-                                    ctx.moveTo(padL, gy)
-                                    ctx.lineTo(padL + cw, gy)
-                                    ctx.stroke()
-                                    
-                                    // Y-axis labels
-                                    var labelVal = maxP - (range * gi / gridLines)
-                                    ctx.fillStyle = Qt.rgba(1, 1, 1, 0.35)
-                                    ctx.font = "10px sans-serif"
-                                    ctx.textAlign = "right"
-                                    ctx.fillText(labelVal.toFixed(0) + "W", padL - 5, gy + 4)
-                                }
-                                
-                                // X-axis time labels
-                                ctx.fillStyle = Qt.rgba(1, 1, 1, 0.3)
-                                ctx.font = "9px sans-serif"
-                                ctx.textAlign = "center"
-                                var xLabels = 5
-                                for (var xi = 0; xi <= xLabels; xi++) {
-                                    var t = tMin + tRange * xi / xLabels
-                                    var d = new Date(t * 1000)
-                                    var tLabel = d.getHours().toString().padStart(2, '0') + ":" + d.getMinutes().toString().padStart(2, '0')
-                                    var tx = padL + cw * xi / xLabels
-                                    ctx.fillText(tLabel, tx, h - 3)
-                                }
-                                
-                                // Draw gradient fill
-                                ctx.beginPath()
-                                for (var fi = 0; fi < chartData.length; fi++) {
-                                    var fx = padL + ((chartData[fi][0] - tMin) / tRange) * cw
-                                    var fy = padT + ch - ((chartData[fi][1] - minP) / range) * ch
-                                    if (fi === 0) ctx.moveTo(fx, fy)
-                                    else ctx.lineTo(fx, fy)
-                                }
-                                ctx.lineTo(padL + cw, padT + ch)
-                                ctx.lineTo(padL, padT + ch)
-                                ctx.closePath()
-                                var grad = ctx.createLinearGradient(0, padT, 0, padT + ch)
-                                grad.addColorStop(0, Qt.rgba(0.39, 0.4, 0.95, 0.3))
-                                grad.addColorStop(1, Qt.rgba(0.39, 0.4, 0.95, 0.02))
-                                ctx.fillStyle = grad
-                                ctx.fill()
-                                
-                                // Draw line
-                                ctx.beginPath()
-                                for (var li = 0; li < chartData.length; li++) {
-                                    var lx = padL + ((chartData[li][0] - tMin) / tRange) * cw
-                                    var ly = padT + ch - ((chartData[li][1] - minP) / range) * ch
-                                    if (li === 0) ctx.moveTo(lx, ly)
-                                    else ctx.lineTo(lx, ly)
-                                }
-                                ctx.strokeStyle = "#818cf8"
-                                ctx.lineWidth = 2
-                                ctx.stroke()
-                            }
+                            series: root.chartSeries
+                            emptyText: root.chartSource === "unavailable"
+                                       ? "Сервер недоступен" : "Нет данных"
                         }
-                        
-                        // Stats row
+
                         RowLayout {
                             Layout.fillWidth: true
-                            spacing: 20
-                            
+                            visible: root.chartKind === "socket" && root.chartSummary !== null
+                            spacing: 0
+
                             Repeater {
-                                model: {
-                                    if (!chartData || chartData.length === 0) return []
-                                    var min = Infinity, max = -Infinity, sum = 0
-                                    for (var i = 0; i < chartData.length; i++) {
-                                        var p = chartData[i][1]
-                                        if (p < min) min = p
-                                        if (p > max) max = p
-                                        sum += p
-                                    }
-                                    var avg = sum / chartData.length
-                                    return [
-                                        {label: "Мин", value: min.toFixed(1) + "W", color: "#34d399"},
-                                        {label: "Макс", value: max.toFixed(1) + "W", color: "#f87171"},
-                                        {label: "Среднее", value: avg.toFixed(1) + "W", color: "#818cf8"},
-                                        {label: "Точек", value: chartData.length.toString(), color: Qt.rgba(1,1,1,0.4)}
-                                    ]
-                                }
-                                
+                                model: root.chartSummary ? [
+                                    {k: "мин", v: root.chartSummary.min.toFixed(0) + " Вт"},
+                                    {k: "сред", v: root.chartSummary.avg.toFixed(0) + " Вт"},
+                                    {k: "макс", v: root.chartSummary.max.toFixed(0) + " Вт"},
+                                    {k: "расход", v: root.chartSummary.kwh.toFixed(2) + " кВт·ч"}
+                                ] : []
+
                                 RowLayout {
+                                    Layout.fillWidth: true
                                     spacing: 4
                                     PlasmaComponents.Label {
-                                        text: modelData.label + ":"
-                                        font.pixelSize: 9
-                                        color: Qt.rgba(1, 1, 1, 0.4)
+                                        text: modelData.k
+                                        font.pixelSize: 10
+                                        color: Qt.rgba(1, 1, 1, 0.45)
                                     }
                                     PlasmaComponents.Label {
-                                        text: modelData.value
+                                        text: modelData.v
                                         font.pixelSize: 10
-                                        font.weight: Font.Bold
-                                        color: modelData.color
+                                        font.bold: true
+                                        color: "#e8eaf0"
                                     }
                                 }
                             }
