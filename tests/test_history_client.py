@@ -199,15 +199,16 @@ def test_fetch_summary_failure_leaves_the_metric_out_of_summaries(monkeypatch):
 
 # -- get_energy --------------------------------------------------------
 
-def test_get_energy_reports_null_for_a_device_with_no_data(monkeypatch):
+def test_get_energy_reports_null_when_summary_has_no_points(monkeypatch):
     """
-    /summary answers "no rows" and "genuinely zero" identically (both come
-    back as all-zero statistics), so get_energy must not rely on /summary to
-    tell them apart. It reads the raw series instead: an empty series means
-    the collector has nothing recorded for this device, which is a different
-    fact from "recorded and it was zero" and must not be reported as 0.0.
+    points == 0 is the signal that nothing was recorded at all -- a
+    different fact from "recorded, and it summed to zero" -- so it must
+    become None, never 0.0.
     """
-    monkeypatch.setattr(history_client, "fetch_series", lambda *a, **k: [])
+    monkeypatch.setattr(
+        history_client, "fetch_summary",
+        lambda *a, **k: {"min": 0.0, "avg": 0.0, "max": 0.0, "kwh": 0.0, "points": 0},
+    )
     energy, source = history_client.get_energy(
         {"history_server": "http://example", "history_timeout": 3},
         "tok", ["dev-with-no-data"], 5,
@@ -216,14 +217,36 @@ def test_get_energy_reports_null_for_a_device_with_no_data(monkeypatch):
     assert source == "server"
 
 
-def test_get_energy_integrates_the_raw_series_for_a_device_with_data(monkeypatch):
-    raw = [[t, 100.0] for t in range(0, 3601, 60)]
-    monkeypatch.setattr(history_client, "fetch_series", lambda *a, **k: raw)
+def test_get_energy_reports_zero_when_summary_has_points_that_sum_to_zero(monkeypatch):
+    """
+    The other half of the pair above, and the whole point of the "points"
+    field: points > 0 with kwh == 0.0 is a real measurement (the device was
+    recorded and genuinely drew nothing), so it must be reported as 0.0,
+    not folded into the same None as "no data".
+    """
+    monkeypatch.setattr(
+        history_client, "fetch_summary",
+        lambda *a, **k: {"min": 0.0, "avg": 0.0, "max": 0.0, "kwh": 0.0, "points": 42},
+    )
+    energy, source = history_client.get_energy(
+        {"history_server": "http://example", "history_timeout": 3},
+        "tok", ["dev-idle-all-day"], 5,
+    )
+    assert energy == {"dev-idle-all-day": 0.0}
+    assert energy["dev-idle-all-day"] is not None
+    assert source == "server"
+
+
+def test_get_energy_reports_the_real_kwh_for_a_device_with_data(monkeypatch):
+    monkeypatch.setattr(
+        history_client, "fetch_summary",
+        lambda *a, **k: {"min": 50.0, "avg": 100.0, "max": 150.0, "kwh": 0.1, "points": 61},
+    )
     energy, source = history_client.get_energy(
         {"history_server": "http://example", "history_timeout": 3},
         "tok", ["dev1"], 1,
     )
-    assert abs(energy["dev1"] - 0.1) < 1e-9
+    assert energy["dev1"] == 0.1
     assert source == "server"
 
 
@@ -236,7 +259,7 @@ def test_get_energy_is_unavailable_with_no_server_configured():
 
 
 def test_get_energy_is_unavailable_when_the_server_cannot_be_reached(monkeypatch):
-    monkeypatch.setattr(history_client, "fetch_series", lambda *a, **k: None)
+    monkeypatch.setattr(history_client, "fetch_summary", lambda *a, **k: None)
     energy, source = history_client.get_energy(
         {"history_server": "http://example", "history_timeout": 3},
         "tok", ["dev1"], 1,
@@ -250,12 +273,12 @@ def test_get_energy_reports_server_if_any_device_was_reached(monkeypatch):
     One socket having nothing recorded should not make the whole command
     claim the collector is unreachable when another socket answered fine.
     """
-    raw = [[0, 100.0], [60, 100.0]]
+    def fake_fetch_summary(base_url, token, device_id, hours, metric, timeout):
+        if device_id == "dev1":
+            return {"min": 100.0, "avg": 100.0, "max": 100.0, "kwh": 0.1, "points": 2}
+        return None
 
-    def fake_fetch_series(base_url, token, device_id, hours, metric, timeout):
-        return raw if device_id == "dev1" else None
-
-    monkeypatch.setattr(history_client, "fetch_series", fake_fetch_series)
+    monkeypatch.setattr(history_client, "fetch_summary", fake_fetch_summary)
     energy, source = history_client.get_energy(
         {"history_server": "http://example", "history_timeout": 3},
         "tok", ["dev1", "dev2"], 1,

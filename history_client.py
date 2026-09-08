@@ -125,15 +125,20 @@ def get_energy(settings_dict, token, device_ids, hours):
     "unavailable" if none of them could be reached at all (including no
     server being configured).
 
-    This reads each device's raw power series and integrates it directly,
-    rather than going through /summary, because /summary cannot tell "no
-    rows for this device" apart from "recorded and it was genuinely zero" --
-    both come back as all-zero statistics. A device with nothing recorded
-    must report None, not 0.0: absent data and zero consumption are
-    different facts, and this is the one caller that needs to keep them
-    apart. There is no local-file fallback here either, unlike get_series:
-    the local cache only ever holds a few hours, which would silently
-    understate "today's total" for anything requested after sunrise.
+    Uses /summary rather than pulling the raw series: a day's worth of power
+    readings is on the order of twenty thousand points, and this is called
+    on a timer for every configured socket, which is exactly the shipping
+    cost /summary exists to avoid. The only reason an earlier version of
+    this function read raw rows instead was that /summary's own
+    min/avg/max/kwh are all zero both for "nothing recorded" and for
+    "recorded, and it summed to zero" -- indistinguishable from those four
+    numbers alone. /summary's response carries a "points" count precisely to
+    close that gap: points == 0 means nothing was recorded (report None),
+    while points > 0 means the number is a real, if possibly zero, kwh
+    figure (report it as-is, including 0.0). There is no local-file
+    fallback here, unlike get_series: the local cache only ever holds a few
+    hours, which would silently understate "today's total" for anything
+    requested after sunrise.
     """
     base_url = settings_dict.get("history_server") or ""
     timeout = settings_dict.get("history_timeout", 3)
@@ -144,13 +149,11 @@ def get_energy(settings_dict, token, device_ids, hours):
         if not base_url:
             energy[device_id] = None
             continue
-        rows = fetch_series(base_url, token, device_id, hours, "power", timeout)
-        if rows is None:
+        summary = fetch_summary(base_url, token, device_id, hours, "power", timeout)
+        if summary is None:
             energy[device_id] = None
             continue
         reached = True
-        energy[device_id] = (
-            chart_data.summarise(rows, integrate=True)["kwh"] if rows else None
-        )
+        energy[device_id] = summary["kwh"] if summary.get("points", 0) > 0 else None
 
     return energy, ("server" if reached else "unavailable")

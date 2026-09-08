@@ -200,7 +200,7 @@ def test_handler_sets_a_connection_timeout():
 
 def test_summary_returns_the_four_numbers_for_power(base_url):
     result = fetch(f"{base_url}/summary?device=dev1&metric=power&hours=999999999")
-    assert set(result) == {"min", "avg", "max", "kwh"}
+    assert set(result) == {"min", "avg", "max", "kwh", "points"}
     assert result["min"] == 80.0
     assert result["max"] == 90.9
     assert result["kwh"] is not None
@@ -230,7 +230,25 @@ def test_summary_non_numeric_hours_is_400(base_url):
 
 def test_summary_for_unknown_device_is_zeros_not_an_error(base_url):
     result = fetch(f"{base_url}/summary?device=ghost&metric=power&hours=999999999")
-    assert result == {"min": 0.0, "avg": 0.0, "max": 0.0, "kwh": 0.0}
+    assert result == {"min": 0.0, "avg": 0.0, "max": 0.0, "kwh": 0.0, "points": 0}
+
+
+def test_summary_reports_the_row_count_it_used(base_url):
+    # dev1 has two power rows in the fixture (ts 1000 and 1010).
+    result = fetch(f"{base_url}/summary?device=dev1&metric=power&hours=999999999")
+    assert result["points"] == 2
+
+
+def test_summary_for_unknown_device_reports_zero_points(base_url):
+    # Zero points alongside all-zero statistics is exactly what tells apart
+    # "nothing recorded" from "recorded, and it summed to zero" -- the
+    # latter would also show min/avg/max/kwh of 0, but with points > 0.
+    result = fetch(f"{base_url}/summary?device=ghost&metric=power&hours=999999999")
+    assert result["points"] == 0
+    assert result["min"] == 0.0
+    assert result["avg"] == 0.0
+    assert result["max"] == 0.0
+    assert result["kwh"] == 0.0
 
 
 def test_absent_hours_defaults_to_24_and_returns_data(tmp_path):

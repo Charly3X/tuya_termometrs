@@ -140,8 +140,17 @@ def make_handler(conn, token, retention_days=365):
                     # 45 W instead of 9 W. storage.series here returns the
                     # same raw rows /series does, before any such reduction.
                     metric = (query.get("metric") or ["power"])[0]
-                    rows = storage.series(request_conn, device, metric, since)
-                    stats = chart_data.summarise(list(rows), integrate=(metric == "power"))
+                    rows = list(storage.series(request_conn, device, metric, since))
+                    stats = chart_data.summarise(rows, integrate=(metric == "power"))
+                    # min/avg/max/kwh are all-zero both for "nothing
+                    # recorded" and for "recorded, and it summed to zero" --
+                    # the two are different facts (a device with no rows at
+                    # all vs. one that was genuinely idle), and a caller that
+                    # needs to tell them apart (see history_client.get_energy)
+                    # has no way to from those four numbers alone. This costs
+                    # four bytes and answers it without shipping the rows
+                    # themselves.
+                    stats["points"] = len(rows)
                     self._send(200, stats)
                 else:
                     self._send(404, {"error": "not found"})
