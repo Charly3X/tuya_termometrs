@@ -20,11 +20,38 @@ A modern desktop widget for KDE Plasma 6 that displays real-time data from Tuya 
 - Debian 13 (or similar Linux distribution)
 - KDE Plasma 6
 - Python 3.11+
-- Tuya Cloud Developer Account
+- A Smart Life / Tuya Smart app account (a Tuya developer account is optional)
 
 ## Installation
 
-### 1. Get Tuya Cloud Credentials
+### 1. Get cloud access
+
+There are two cloud backends. **Smart Life (recommended)** is the default.
+
+#### Option A — Smart Life QR login (recommended)
+
+Uses the official [`tuya-device-sharing-sdk`](https://github.com/tuya/tuya-device-sharing-sdk),
+the same mechanism Home Assistant switched to in 2024.2. It authenticates against
+your Smart Life / Tuya Smart app account, so **no developer project and no IoT
+Core subscription are needed** — nothing expires after the trial ends.
+
+1. In the Smart Life app: **Me** → ⚙️ → **Account and Security** → copy your **User Code**
+2. Run the login helper and scan the QR code with the app (**+** → **Scan**):
+
+```bash
+./venv/bin/python3 tuya_auth.py
+```
+
+The session is stored in `sharing_token.json` and refreshes itself. The helper
+prints every device in the account with its id and status codes, which is how
+you fill in `devices` / `local_devices` in `config.json`.
+
+#### Option B — IoT Core developer project (legacy)
+
+Needs an active IoT Core subscription. Trials expire and the API then returns
+`28841002 IoT Core service subscription has expired`, which blanks out all
+readings. Use this only if you deliberately want the developer API; set
+`"cloud_backend": "iot_core"` in `config.json` to force it.
 
 1. Go to [Tuya IoT Platform](https://iot.tuya.com)
 2. Create a Cloud Project:

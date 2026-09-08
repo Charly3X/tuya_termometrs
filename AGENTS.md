@@ -6,8 +6,14 @@ This repository contains a KDE Plasma 6 widget (plasmoid) that displays data fro
 - Optional smart plug (power, voltage, energy)
 
 The widget supports two connection modes:
-- **Cloud API mode**: Uses Tuya Cloud API via `tinytuya.Cloud`
+- **Cloud API mode**: Uses Tuya Cloud API
 - **Local Network mode**: Direct communication with devices on local network via `tinytuya.Device`
+
+Cloud mode has two backends:
+- **Smart Life sharing (default)**: `tuya_sharing_api.py`, QR login against the app
+  account. No IoT Core subscription required.
+- **IoT Core (legacy fallback)**: `tinytuya.Cloud` in `tuya_client.py`. Breaks with
+  error `28841002` when the developer trial expires.
 
 The widget UI is implemented in QML and periodically calls a local Python script.
 
@@ -33,6 +39,18 @@ The widget UI is implemented in QML and periodically calls a local Python script
   - Local network communication module.
   - Handles direct device connections using `tinytuya.Device`.
   - Parses DPS (Data Point) values for thermometers and smart plugs.
+- `tuya_sharing_api.py`
+  - Smart Life cloud backend built on `tuya-device-sharing-sdk`.
+  - Session storage (`sharing_token.json`), automatic token refresh, QR login helpers.
+  - Queries `/v1.0/m/life/ha/devices/detail` directly (one request per refresh)
+    instead of `Manager.update_device_cache()`, which would issue four extra
+    enrichment calls per device.
+  - Falls back to `/v1.0/m/life/ha/{id}/shadow/properties` per device when the
+    detail endpoint returns `status: null`.
+  - Forces IPv4 via `prefer_ipv4()`; see the troubleshooting notes.
+- `tuya_auth.py`
+  - One-time QR login CLI. Prints the QR as ASCII, then lists the account's
+    devices with their ids and status codes.
 - `get_local_keys.py`
   - Helper script to retrieve local keys from cloud API for local mode setup.
 - `install.sh`
@@ -79,7 +97,8 @@ The widget UI is implemented in QML and periodically calls a local Python script
   - Local mode: `local_devices` array (id, name, ip, local_key, version), optional `local_socket` object
 
 Files created/used at runtime in the repo directory:
-- `token_cache.json` (cloud mode only)
+- `sharing_token.json` (Smart Life backend; contains access/refresh tokens, mode 600)
+- `token_cache.json` (IoT Core backend only)
 - `device_names_cache.json` (cloud mode only)
 - `api_calls.log`
 - `data.json`
@@ -127,6 +146,25 @@ When an AI agent is asked to implement a change:
 - **Install behavior**: `install.sh`
 
 ## Troubleshooting notes
+- **Battery-powered Wi-Fi thermometers cannot be polled locally at all.** They sleep
+  and only push to the cloud: they do not answer on port 6668 and do not respond to
+  `tinytuya.deviceScan` broadcasts. Any "make the sensors work locally" request is
+  impossible with this hardware — only the smart plugs are locally reachable.
+- **Do not remove `prefer_ipv4()` from `tuya_sharing_api.py`.** `apigw.tuyaeu.com`
+  publishes AAAA records that are black-holed on this connection. urllib3 tries the
+  resolved addresses sequentially with the SDK's 60s timeout, so every cloud request
+  took ~180s (3 dead IPv6 addresses) before falling back to IPv4, which answers in
+  ~0.2s. curl hides this because it does Happy Eyeballs; Python does not.
+- **"Спальня" (`bfac5ed4`) and "Детская" (`bf19c499`) always return `status: null`**
+  from the device detail endpoint. Their product definition in Tuya's catalog is
+  wrong: category `tdq` (circuit breaker) instead of `wsdcg`, and
+  `/v1.1/m/life/{id}/specifications` is empty. Their values are only available via
+  the shadow endpoint. "Зал" (`bfb3a145`, category `wsdcg`) works normally. The
+  IoT Core path has the same split, which is why it also has a shadow fallback.
+- Cloud error `28841002 IoT Core service subscription has expired` means the IoT Core
+  trial ended. Either extend it on iot.tuya.com (Cloud → Cloud Services → IoT Core →
+  My Subscriptions → Extend Trial Period) or use the Smart Life backend, which does
+  not depend on it.
 - Battery-powered sensors may not provide real-time status in cloud mode; shadow properties are used as fallback.
 - Local mode provides faster updates but requires devices to be on the same network.
 - If device names are stale (cloud mode), delete `device_names_cache.json` (cache is 24h).

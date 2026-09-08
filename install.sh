@@ -5,8 +5,10 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # Create venv if not exists
 if [ ! -d "$SCRIPT_DIR/venv" ]; then
     python3 -m venv "$SCRIPT_DIR/venv"
-    "$SCRIPT_DIR/venv/bin/pip" install tinytuya
 fi
+
+# Always sync dependencies so existing venvs pick up new ones
+"$SCRIPT_DIR/venv/bin/pip" install -q -r "$SCRIPT_DIR/requirements.txt"
 
 # Install widget
 mkdir -p ~/.local/share/plasma/plasmoids/org.kde.plasma.tuya

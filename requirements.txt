@@ -1,1 +1,3 @@
 tinytuya
+tuya-device-sharing-sdk
+qrcode

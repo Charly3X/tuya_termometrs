@@ -12,3 +12,5 @@ device_names_cache.json
 nohup.out
 tinytuya.json
 snapshot.json
+sharing_token.json
+ip_cache.json

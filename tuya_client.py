@@ -11,6 +11,7 @@ from tuya_local import (
     log_local_call
 )
 from tuya_history import add_readings, get_device_history
+import tuya_sharing_api
 
 CONFIG_FILE = Path(__file__).parent / "config.json"
 OUTPUT_FILE = Path(__file__).parent / "data.json"
@@ -154,11 +155,32 @@ def get_cloud_and_device_map(config):
     
     return cloud, device_map
 
+def use_sharing_backend(config):
+    """
+    Whether to read the cloud through the Smart Life sharing SDK.
+
+    Preferred over tinytuya.Cloud because it does not need an IoT Core
+    subscription. Set "cloud_backend": "iot_core" in config.json to force the
+    old path.
+    """
+    if not config:
+        return False
+    try:
+        return tuya_sharing_api.is_available(config)
+    except Exception:
+        return False
+
 def get_temperatures():
     config = load_config()
     if not config:
         return {"temperatures": ["-", "-", "-"], "humidity": ["-", "-", "-"], "names": ["No config", "", ""], "batteries": [0, 0, 0]}
-    
+
+    if use_sharing_backend(config):
+        try:
+            return tuya_sharing_api.get_sharing_temperatures(config, log_api_call)
+        except Exception as e:
+            log_api_call(f"SHARING ERROR: {str(e)}, falling back to IoT Core")
+
     cloud, device_map = get_cloud_and_device_map(config)
     devices = config["devices"]
     
@@ -232,9 +254,18 @@ def get_temperatures():
 
 def get_socket_data():
     config = load_config()
+
+    if use_sharing_backend(config):
+        try:
+            result = tuya_sharing_api.get_sharing_socket_data(config, log_api_call)
+            if result.get("sockets"):
+                return result
+        except Exception as e:
+            log_api_call(f"SHARING ERROR: {str(e)}, falling back to IoT Core")
+
     if not config or "socket" not in config:
         return {"socket": {"name": "", "power": "--", "voltage": "--", "energy": "--"}}
-    
+
     cloud, device_map = get_cloud_and_device_map(config)
     socket_id = config["socket"]
     
@@ -263,7 +294,16 @@ def get_all_data():
     config = load_config()
     if not config:
         return {"temperatures": ["-", "-", "-"], "humidity": ["-", "-", "-"], "names": ["No config", "", ""], "batteries": [0, 0, 0], "socket": {}}
-    
+
+    if use_sharing_backend(config):
+        try:
+            result = tuya_sharing_api.get_sharing_temperatures(config, log_api_call)
+            result.update(tuya_sharing_api.get_sharing_socket_data(config, log_api_call))
+            result["last_update"] = datetime.now().strftime("%H:%M:%S")
+            return result
+        except Exception as e:
+            log_api_call(f"SHARING ERROR: {str(e)}, falling back to IoT Core")
+
     cloud, device_map = get_cloud_and_device_map(config)
     
     devices = config["devices"]
