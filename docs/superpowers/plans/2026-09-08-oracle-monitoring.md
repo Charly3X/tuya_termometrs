@@ -10,6 +10,29 @@
 
 Spec: [2026-09-08-oracle-monitoring-design.md](../specs/2026-09-08-oracle-monitoring-design.md)
 
+## Synchronisation: there isn't any, deliberately
+
+The two stores are never reconciled, and that is a decision rather than an
+oversight. Worth stating plainly because "the widget reads from the server"
+sounds like sync and is not.
+
+- **The server is the single source of truth.** The local `power_history.json`
+  is an emergency cache, shrunk to six hours in Task 8.
+- **Nothing travels upward.** The widget never pushes readings to the server,
+  so the API keeps having no write path at all. That matters because the
+  server also holds `sharing_token.json`, a key to the whole Smart Life
+  account.
+- **Resolution does not suffer while the desktop is on.** The sockets report to
+  the cloud in response to local polling, so whatever the widget sees locally
+  the collector sees through MQTT at the same cadence.
+- **The one accepted hole:** if the *server* is down while the desktop is up,
+  those readings exist only in the local cache and never reach the database.
+  The chart falls back and stays usable during the outage, but the history
+  keeps a gap afterwards. Closing it would need an ingest endpoint, which is
+  not worth putting on the machine that holds the account credentials.
+- **Both sides timestamp in Unix seconds, UTC.** No local time anywhere, in the
+  database or on the wire. Do not "fix" this into local time.
+
 ## Global Constraints
 
 - Python interpreter is always `./venv/bin/python3`. Never `python3`.
@@ -1491,11 +1514,11 @@ git commit -m "Add read-only history API"
 
 **Files:**
 - Create: `history_client.py`, `tests/test_history_client.py`
-- Modify: `tuya_client.py` (the `history` branch of `__main__`)
+- Modify: `tuya_client.py` (the `history` branch of `__main__`), `tuya_history.py`, `contents/ui/main.qml`
 
 **Interfaces:**
 - Consumes: `settings.load_settings`, `tuya_history.get_device_history`.
-- Produces: `history_client.get_history(settings_dict, token, device_id, hours) -> list`.
+- Produces: `history_client.get_history(settings_dict, token, device_id, hours) -> tuple[list, str]` where the second element is `"server"` or `"local"`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1535,27 +1558,56 @@ def server_url():
 
 def test_uses_the_server_when_it_answers(server_url, monkeypatch):
     monkeypatch.setattr(history_client, "local_history", lambda d, h: [["local"]])
-    result = history_client.get_history(
+    rows, source = history_client.get_history(
         {"history_server": server_url, "history_timeout": 3}, "tok", "dev1", 1
     )
-    assert result == REMOTE_ROWS
+    assert rows == REMOTE_ROWS
+    assert source == "server"
 
 
 def test_falls_back_when_the_server_is_unreachable(monkeypatch):
     monkeypatch.setattr(history_client, "local_history", lambda d, h: [["local"]])
-    result = history_client.get_history(
+    rows, source = history_client.get_history(
         {"history_server": "http://127.0.0.1:1", "history_timeout": 1},
         "tok", "dev1", 1,
     )
-    assert result == [["local"]]
+    assert rows == [["local"]]
+    assert source == "local"
 
 
 def test_falls_back_when_no_server_is_configured(monkeypatch):
     monkeypatch.setattr(history_client, "local_history", lambda d, h: [["local"]])
-    result = history_client.get_history(
+    rows, source = history_client.get_history(
         {"history_server": "", "history_timeout": 3}, "tok", "dev1", 1
     )
-    assert result == [["local"]]
+    assert rows == [["local"]]
+    assert source == "local"
+
+
+def test_empty_server_answer_falls_back_instead_of_blanking_the_chart(monkeypatch):
+    """
+    An empty list is a valid HTTP answer, not a failure -- but treating it as
+    data blanks the chart right after deployment, while the collector has no
+    rows for this device yet and the local file still does.
+    """
+    monkeypatch.setattr(history_client, "local_history", lambda d, h: [["local"]])
+    monkeypatch.setattr(history_client, "fetch_remote", lambda *a, **k: [])
+    rows, source = history_client.get_history(
+        {"history_server": "http://example", "history_timeout": 3}, "tok", "dev1", 1
+    )
+    assert rows == [["local"]]
+    assert source == "local"
+
+
+def test_empty_from_both_sides_is_reported_as_server(monkeypatch):
+    """Nothing anywhere is not a fallback situation; do not cry wolf."""
+    monkeypatch.setattr(history_client, "local_history", lambda d, h: [])
+    monkeypatch.setattr(history_client, "fetch_remote", lambda *a, **k: [])
+    rows, source = history_client.get_history(
+        {"history_server": "http://example", "history_timeout": 3}, "tok", "dev1", 1
+    )
+    assert rows == []
+    assert source == "server"
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -1602,15 +1654,28 @@ def fetch_remote(base_url, token, device_id, hours, timeout):
 
 
 def get_history(settings_dict, token, device_id, hours):
+    """
+    (rows, source) where source is "server" or "local".
+
+    The source is returned so the widget can say which one it drew, instead of
+    silently showing a gappy local chart that looks like real data.
+    """
     base_url = settings_dict.get("history_server") or ""
     if base_url:
         rows = fetch_remote(
             base_url, token, device_id, hours,
             settings_dict.get("history_timeout", 3),
         )
+        if rows:
+            return rows, "server"
         if rows is not None:
-            return rows
-    return local_history(device_id, hours)
+            # The server answered with nothing. That happens right after
+            # deployment, before the collector has rows for this device. Prefer
+            # local data if there is any, rather than drawing an empty chart.
+            local = local_history(device_id, hours)
+            return (local, "local") if local else ([], "server")
+
+    return local_history(device_id, hours), "local"
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -1629,8 +1694,14 @@ In `tuya_client.py`, replace the `history` branch inside `__main__`:
         hours = int(args[2]) if len(args) > 2 else 1
         app_settings = load_settings()
         token = (load_config() or {}).get("history_token", "")
-        history = history_client.get_history(app_settings, token, device_id, hours)
-        print(json.dumps({"history": history, "history_device": device_id}))
+        history, source = history_client.get_history(
+            app_settings, token, device_id, hours
+        )
+        print(json.dumps({
+            "history": history,
+            "history_device": device_id,
+            "history_source": source,
+        }))
         sys.exit(0)
 ```
 
@@ -1640,16 +1711,81 @@ and add the import at the top:
 import history_client
 ```
 
-- [ ] **Step 6: Verify the fallback path still works with no server configured**
+- [ ] **Step 6: Shrink the local cache**
+
+With the server as the single source of truth, keeping a full day locally means
+rewriting a 440 KB JSON file every 7 seconds for data nobody reads. Six hours is
+enough to cover the 1h and 6h chart buttons during a server outage.
+
+In `tuya_history.py`, replace the constant:
+
+```python
+# Emergency cache only -- the server is the source of truth. Sized in hours
+# rather than entries because the poll interval has changed before: the old
+# 8640 was labelled "24h at 10s" but the widget polls every 7s, so it actually
+# held about 17 hours and the 24h chart button quietly showed less than a day.
+LOCAL_HISTORY_HOURS = 6
+MAX_ENTRIES_PER_DEVICE = LOCAL_HISTORY_HOURS * 3600 // 5  # 5s floor on polling
+```
+
+- [ ] **Step 7: Show which source the chart came from**
+
+In `contents/ui/main.qml`, add the property next to the other chart properties
+(near line 24):
+
+```qml
+    property string chartSource: "server"
+```
+
+In the `onNewData` handler, next to the existing history branch:
+
+```qml
+                    if (result.history !== undefined) {
+                        // Only update chart if data is for the currently selected device
+                        if (!result.history_device || result.history_device === chartDeviceId) {
+                            chartData = result.history
+                            chartSource = result.history_source || "server"
+                            chartCanvas.requestPaint()
+                        }
+                    }
+```
+
+Add a warning label inside the chart area, directly above the period selector
+`RowLayout` (near line 515):
+
+```qml
+                        PlasmaComponents.Label {
+                            Layout.alignment: Qt.AlignHCenter
+                            visible: chartSource === "local"
+                            text: "локальные данные, сервер недоступен"
+                            font.pixelSize: 10
+                            color: "#fbbf24"
+                        }
+```
+
+- [ ] **Step 8: Verify the fallback path with no server configured**
 
 Run: `./venv/bin/python3 tuya_client.py history bf973442af478b5404fupa 1`
-Expected: the same chart JSON as before the change, read from `power_history.json`
+Expected: the same chart rows as before, plus `"history_source": "local"`
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 9: Install the QML change and restart the shell**
+
+This is the one task in the plan that touches QML, so unlike every other task
+it needs the widget reinstalled:
 
 ```bash
-git add history_client.py tests/test_history_client.py tuya_client.py
-git commit -m "Read chart history from the server with local fallback"
+cp contents/ui/main.qml ~/.local/share/plasma/plasmoids/org.kde.plasma.tuya/contents/ui/main.qml
+killall plasmashell && sleep 2 && nohup plasmashell &
+```
+
+Click a socket in the widget. Expected: the chart draws, with the amber
+"локальные данные" line visible while no server is configured.
+
+- [ ] **Step 10: Commit**
+
+```bash
+git add history_client.py tests/test_history_client.py tuya_client.py tuya_history.py contents/ui/main.qml
+git commit -m "Read chart history from the server, showing when the local fallback is used"
 ```
 
 ---
@@ -1777,7 +1913,7 @@ git commit -m "Add one-off import of the legacy history file"
 - [ ] **Step 1: Run the whole suite**
 
 Run: `./venv/bin/python3 -m pytest tests/ -v`
-Expected: all tests pass, 54 total
+Expected: all tests pass, 56 total
 
 - [ ] **Step 2: Write the collector unit**
 
@@ -1971,6 +2107,8 @@ git commit -m "Add systemd units and server deployment guide"
 
 **Spec coverage.** Collector with push and polling → Task 6. Read-only API → Task 7. Widget change with fallback → Task 8. SQLite storage and the narrow schema → Task 3. Human units from declared scales → Task 2. Retention of 365 days → Task 4 and the cron entry in Task 10. Manual prune with dry-run and VACUUM → Task 4. Config split by purpose → Task 1. Device roles detected rather than configured → Task 5. Legacy import → Task 9. Separate QR login on the server, `prefer_ipv4`, port opened in both places → Task 10. Every spec section maps to a task.
 
-**Type consistency.** `storage.write(conn, ts, device, values)` is called with that argument order in Tasks 4, 6 and 9. `units.convert(code, value, scales)` returns a `(metric, value)` tuple or `None`, and both callers in Task 6 check for `None` before unpacking. `roles.classify` returns `(push, poll, scales)` and Task 6 unpacks exactly three values. `history_client.get_history(settings_dict, token, device_id, hours)` has the same signature in its test, its implementation and the `tuya_client.py` call site.
+**Type consistency.** `storage.write(conn, ts, device, values)` is called with that argument order in Tasks 4, 6 and 9. `units.convert(code, value, scales)` returns a `(metric, value)` tuple or `None`, and both callers in Task 6 check for `None` before unpacking. `roles.classify` returns `(push, poll, scales)` and Task 6 unpacks exactly three values. `history_client.get_history(settings_dict, token, device_id, hours)` returns a `(rows, source)` tuple in its implementation, all five of its tests and the `tuya_client.py` call site.
+
+**Fallback semantics.** An earlier draft returned the server's answer whenever the request itself succeeded, which would have blanked the chart for any device the collector had no rows for yet — a blank chart on the first day of deployment, with usable local data sitting right there. `get_history` now falls back on an empty answer too, and only reports `"server"` for an empty result when the local cache is empty as well, so the widget does not warn about a fallback that did not happen.
 
 **Known deviation from the spec.** The spec's `settings.json` table lists a log level; the plan drops it because both services log through journald, which already has level filtering. Nothing else in the spec is unimplemented.
