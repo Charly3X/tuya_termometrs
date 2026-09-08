@@ -10,6 +10,11 @@ from server import api, storage
 
 TOKEN = "secret-token"
 
+# The fixture's rows sit just after the epoch, so the fixture server is
+# given a retention long enough that the "hours" clamp still reaches them.
+# Tests that are about the clamp itself build their own server below.
+FIXTURE_RETENTION_DAYS = 100_000
+
 
 @pytest.fixture
 def base_url(tmp_path):
@@ -18,7 +23,10 @@ def base_url(tmp_path):
     storage.write(conn, 1010, "dev1", {"power": 80.0})
     storage.write(conn, 1020, "dev2", {"temperature": 23.6})
 
-    server = ThreadingHTTPServer(("127.0.0.1", 0), api.make_handler(conn, TOKEN))
+    server = ThreadingHTTPServer(
+        ("127.0.0.1", 0),
+        api.make_handler(conn, TOKEN, retention_days=FIXTURE_RETENTION_DAYS),
+    )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     yield f"http://127.0.0.1:{server.server_port}"
@@ -116,24 +124,91 @@ def test_non_finite_hours_is_400(base_url, value):
     assert excinfo.value.code == 400
 
 
-@pytest.mark.parametrize("value", ["1e20", "99999999999999999999"])
+@pytest.mark.parametrize("value", ["1e20", "99999999999999999999", "1e307"])
 def test_absurdly_large_but_finite_hours_still_works(base_url, value):
-    # Large enough to push "since" far below any recorded timestamp
-    # (and, before it was clamped, far below what SQLite's 64-bit
-    # INTEGER column can hold), but nowhere near overflowing
-    # hours * 3600 to +inf.
+    # These clamp to the retention window rather than being rejected; the
+    # clamped window is still wide enough to cover every fixture row. Before
+    # the clamp, 1e307 overflowed hours * 3600 to +inf and was a 400.
     result = fetch(f"{base_url}/history?device=dev1&hours={value}")
     assert result == [[1000, 90.9, 236.5], [1010, 80.0, 236.5]]
 
 
-def test_hours_large_enough_to_overflow_since_is_400(base_url):
-    # hours * 3600 overflows float64 to +inf for large enough finite
-    # input (Python float multiplication overflows silently, it doesn't
+def make_server(tmp_path, rows, retention_days):
+    conn = storage.connect(tmp_path / "clamp.db")
+    for ts, values in rows:
+        storage.write(conn, ts, "dev1", values)
+    server = ThreadingHTTPServer(
+        ("127.0.0.1", 0), api.make_handler(conn, TOKEN, retention_days=retention_days)
+    )
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server, conn
+
+
+def test_hours_is_clamped_to_the_retention_window(tmp_path):
+    # Uncapped "hours" let one unauthenticated-cost request ask for the
+    # whole database: ~7M rows for one socket at steady state, built as a
+    # Python list and a JSON string in memory on a free-tier VM. Nothing
+    # older than retention survives the nightly prune anyway, so clamping
+    # loses no real data.
+    now = int(time.time())
+    server, conn = make_server(
+        tmp_path,
+        [(now - 10 * 86400, {"power": 1.0, "voltage": 230.0}),
+         (now - 3600, {"power": 2.0})],
+        retention_days=2,
+    )
+    try:
+        result = fetch(f"http://127.0.0.1:{server.server_port}/history"
+                       f"?device=dev1&hours=999999999")
+        assert result == [[now - 3600, 2.0, 0.0]]
+    finally:
+        server.shutdown()
+        conn.close()
+
+
+def test_hours_within_the_retention_window_is_untouched(tmp_path):
+    now = int(time.time())
+    server, conn = make_server(
+        tmp_path,
+        [(now - 10 * 86400, {"power": 1.0, "voltage": 230.0}),
+         (now - 3600, {"power": 2.0})],
+        retention_days=365,
+    )
+    try:
+        result = fetch(f"http://127.0.0.1:{server.server_port}/history"
+                       f"?device=dev1&hours=720")
+        assert result == [[now - 10 * 86400, 1.0, 230.0], [now - 3600, 2.0, 230.0]]
+    finally:
+        server.shutdown()
+        conn.close()
+
+
+def test_a_retention_large_enough_to_overflow_since_is_400(tmp_path):
+    # max_hours is config-derived, so the overflow guard still has to hold:
+    # hours * 3600 overflows float64 to +inf for a large enough finite
+    # value (Python float multiplication overflows silently, it doesn't
     # raise), which would otherwise reach int() as -inf and raise
     # OverflowError deep in the handler.
-    with pytest.raises(urllib.error.HTTPError) as excinfo:
-        fetch(f"{base_url}/history?device=dev1&hours=1e307")
-    assert excinfo.value.code == 400
+    server, conn = make_server(tmp_path, [(1000, {"power": 1.0})], retention_days=1e305)
+    try:
+        with pytest.raises(urllib.error.HTTPError) as excinfo:
+            fetch(f"http://127.0.0.1:{server.server_port}/history"
+                  f"?device=dev1&hours=1e307")
+        assert excinfo.value.code == 400
+    finally:
+        server.shutdown()
+        conn.close()
+
+
+def test_handler_sets_a_connection_timeout():
+    # HTTP/1.1 keep-alive with no timeout lets an unauthenticated client
+    # open a connection to an internet-facing port, send nothing, and hold
+    # a thread indefinitely.
+    conn = storage.connect(":memory:")
+    try:
+        assert api.make_handler(conn, TOKEN).timeout == 10
+    finally:
+        conn.close()
 
 
 def test_absent_hours_defaults_to_24_and_returns_data(tmp_path):

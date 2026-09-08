@@ -20,7 +20,7 @@ from server import storage
 log = logging.getLogger("api")
 
 
-def make_handler(conn, token):
+def make_handler(conn, token, retention_days=365):
     # A falsy token (empty string, None) would make compare_digest("", "")
     # true for a bare "Authorization: Bearer " header, authenticating
     # anyone. A config file with an empty history_token is a plausible
@@ -41,8 +41,25 @@ def make_handler(conn, token):
     # open its own short-lived connection to the same database instead.
     db_path = conn.execute("PRAGMA database_list").fetchone()[2]
 
+    # Nothing older than the retention age survives the nightly prune, so a
+    # larger window can only ever mean "everything there is" — and at steady
+    # state "everything" for one socket is ~7M rows: a multi-gigabyte Python
+    # list plus a ~200 MB JSON string, built in memory on a free-tier VM,
+    # per request, with no concurrency limit. One request would OOM the box
+    # and take the collector down with it. Clamping costs nothing, because
+    # the clamped window still covers every row that exists.
+    max_hours = retention_days * 24
+
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
+
+        # HTTP/1.1 means keep-alive, and without a timeout an
+        # unauthenticated client can open a connection to this
+        # internet-facing port, send nothing, and hold a thread forever.
+        # A handful of those exhaust the box. socketserver applies this to
+        # the connection socket, and BaseHTTPRequestHandler turns the
+        # resulting timeout into a closed connection.
+        timeout = 10
 
         def _send(self, code, payload):
             body = json.dumps(payload).encode()
@@ -76,19 +93,21 @@ def make_handler(conn, token):
             # "infinity", and those survive a bare "> 0" check (nan
             # compares False against everything, +inf is > 0), so
             # math.isfinite() is checked explicitly. A merely absurd but
-            # finite value (e.g. 1e20) is accepted as-is and just pushes
-            # "since" far into the past, which storage.py already treats
-            # as "return everything there is" — but a large enough finite
-            # value can still overflow hours * 3600 to +inf (float
-            # multiplication overflows silently in Python, it doesn't
-            # raise), so the guard checks the actual value that governs
-            # the rest of the handler — the computed "since" — and not
-            # just "hours" in isolation.
+            # finite value is then clamped to the retention window rather
+            # than rejected, so an over-eager client still gets an answer
+            # — just not the whole database in one response. The overflow
+            # guard stays because max_hours is itself config-derived: a
+            # nonsense retention_days can still push hours * 3600 to +inf
+            # (float multiplication overflows silently in Python, it
+            # doesn't raise), so the guard checks the actual value that
+            # governs the rest of the handler — the computed "since" —
+            # and not just "hours" in isolation.
             raw_hours = (query.get("hours") or ["24"])[0]
             try:
                 hours = float(raw_hours)
                 if not math.isfinite(hours) or hours <= 0:
                     raise ValueError("hours must be a finite positive number")
+                hours = min(hours, max_hours)
                 since_float = time.time() - hours * 3600
                 if not math.isfinite(since_float):
                     raise ValueError("hours is too large to compute a time bound")
@@ -125,8 +144,9 @@ def make_handler(conn, token):
     return Handler
 
 
-def serve(conn, token, port):
-    server = ThreadingHTTPServer(("0.0.0.0", port), make_handler(conn, token))
+def serve(conn, token, port, retention_days=365):
+    handler = make_handler(conn, token, retention_days)
+    server = ThreadingHTTPServer(("0.0.0.0", port), handler)
     log.info("listening on port %s", port)
     server.serve_forever()
 
@@ -149,4 +169,5 @@ if __name__ == "__main__":
         # instead of a bare KeyError traceback under systemd.
         config.get("history_token", ""),
         app_settings["server"]["port"],
+        app_settings["server"]["retention_days"],
     )
