@@ -114,3 +114,27 @@ def test_summary_of_nothing_is_all_zeros():
     assert chart_data.summarise_power([]) == {
         "min": 0.0, "avg": 0.0, "max": 0.0, "kwh": 0.0
     }
+
+
+def test_summarise_without_integrate_has_a_null_kwh():
+    """
+    Integrating a temperature curve does not mean anything, so a caller that
+    does not ask for integration must get None back, not a bogus number --
+    and must still get real min/avg/max.
+    """
+    points = [[0, 10.0], [60, 20.0], [120, 30.0]]
+    result = chart_data.summarise(points)
+    assert result["kwh"] is None
+    assert result["min"] == 10.0
+    assert result["max"] == 30.0
+    assert result["avg"] == 20.0
+
+
+def test_summarise_without_integrate_on_empty_points_is_still_null_kwh():
+    result = chart_data.summarise([])
+    assert result == {"min": 0.0, "avg": 0.0, "max": 0.0, "kwh": None}
+
+
+def test_summarise_with_integrate_matches_summarise_power():
+    points = [[t, 100.0 * t / 3600] for t in range(0, 3601, 60)]
+    assert chart_data.summarise(points, integrate=True) == chart_data.summarise_power(points)

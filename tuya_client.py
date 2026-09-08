@@ -441,24 +441,47 @@ if __name__ == "__main__":
             # makes the widget say "нет данных" instead of blaming a machine
             # nobody asked.
             print(json.dumps({"series": {}, "device": device_id,
-                              "source": "empty", "summary": None}))
+                              "source": "empty", "summaries": {}}))
             sys.exit(0)
         metrics = (args[3] if len(args) > 3 else "power").split(",")
         app_settings = load_settings()
         token = (load_config() or {}).get("history_token", "")
-        # The summary comes back from get_series rather than being computed
-        # here, because it has to be taken from the raw rows: the series in
-        # hand is already downsampled, and averaging min/max pairs would
+        # The summaries come back from get_series rather than being computed
+        # here, because they have to be taken from the raw rows: the series
+        # in hand is already downsampled, and averaging min/max pairs would
         # overstate consumption several-fold.
-        series, source, summary = history_client.get_series(
+        series, source, summaries = history_client.get_series(
             app_settings, token, device_id, hours, metrics
         )
         print(json.dumps({
             "series": series,
             "device": device_id,
             "source": source,
-            "summary": summary,
+            "summaries": summaries,
         }))
+        sys.exit(0)
+
+    # Energy mode: today's consumption per socket, integrated from local
+    # midnight to now. A separate mode from "series" because it always asks
+    # for the whole day so far regardless of what the caller passes as
+    # "hours" elsewhere, and because its per-device null-vs-zero contract
+    # (see history_client.get_energy) is different from a chart summary's.
+    if mode == "energy":
+        # Same shell-word-splitting hazard as "series": validate rather than
+        # trust args[1].
+        device_ids = [d for d in (args[1] if len(args) > 1 else "").split(",") if d]
+        if not device_ids:
+            print(json.dumps({"energy": {}, "source": "unavailable"}))
+            sys.exit(0)
+        app_settings = load_settings()
+        token = (load_config() or {}).get("history_token", "")
+        now = datetime.now()
+        midnight = datetime(now.year, now.month, now.day)
+        hours = (now - midnight).total_seconds() / 3600
+        energy, source = history_client.get_energy(
+            app_settings, token, device_ids, hours
+        )
+        print(json.dumps({"energy": energy, "source": source}))
         sys.exit(0)
     
     # Load config

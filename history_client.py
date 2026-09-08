@@ -43,15 +43,31 @@ def fetch_series(base_url, token, device_id, hours, metric, timeout):
         return None
 
 
+def fetch_summary(base_url, token, device_id, hours, metric, timeout):
+    """{"min", "avg", "max", "kwh"} from the server's /summary, or None if
+    the request failed."""
+    query = urllib.parse.urlencode(
+        {"device": device_id, "metric": metric, "hours": hours}
+    )
+    request = urllib.request.Request(f"{base_url.rstrip('/')}/summary?{query}")
+    request.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return json.loads(response.read())
+    except Exception:
+        return None
+
+
 def get_series(settings_dict, token, device_id, hours, metrics):
     """
-    (series, source, summary).
+    (series, source, summaries).
 
     series maps metric name to [[ts, value], ...], already downsampled for
     drawing. source is "server", "local", "unavailable" or "empty", and is
     returned so the widget can say which one it drew rather than silently
-    showing gappy local data that looks complete. summary is the power
-    statistics, or None when power was not among the metrics.
+    showing gappy local data that looks complete. summaries maps metric name
+    to {"min", "avg", "max", "kwh"}, with one entry for each metric that had
+    data -- a metric with nothing recorded simply has no key.
 
     "unavailable" and "empty" are kept apart on purpose. A request that never
     got an answer means the collector is down and the widget should say so.
@@ -59,11 +75,11 @@ def get_series(settings_dict, token, device_id, hours, metrics):
     nothing recorded for this device yet -- announcing a dead server then
     would send the user debugging a machine that is fine.
 
-    The summary is computed from the RAW rows, before downsampling, and that
-    ordering is load-bearing. Downsampling keeps each bucket's minimum and
-    maximum, so a plug at 10% duty collapses to an alternating 0 W / 90 W
-    series with a mean of 45 W instead of 9 W. Summarising what gets drawn
-    would overstate consumption roughly fivefold.
+    Statistics are fetched from the server's own /summary endpoint rather
+    than computed here, so they are always taken from the RAW rows rather
+    than from what got drawn. That ordering is load-bearing: downsampling
+    keeps each bucket's minimum and maximum, so a plug at 10% duty collapses
+    to an alternating 0 W / 90 W series with a mean of 45 W instead of 9 W.
     """
     base_url = settings_dict.get("history_server") or ""
     timeout = settings_dict.get("history_timeout", 3)
@@ -74,18 +90,19 @@ def get_series(settings_dict, token, device_id, hours, metrics):
 
     if base_url:
         series = {}
-        summary = None
+        summaries = {}
         for metric in metrics:
             rows = fetch_series(base_url, token, device_id, hours, metric, timeout)
             if rows is None:
                 unreachable = True
                 continue
             if rows:
-                if metric == "power":
-                    summary = chart_data.summarise_power(rows)
                 series[metric] = chart_data.downsample(rows)
+                summary = fetch_summary(base_url, token, device_id, hours, metric, timeout)
+                if summary is not None:
+                    summaries[metric] = summary
         if series:
-            return series, "server", summary
+            return series, "server", summaries
 
     # Either no server, or it had nothing for any requested metric.
     if any(metric in LOCAL_METRICS for metric in metrics):
@@ -94,7 +111,46 @@ def get_series(settings_dict, token, device_id, hours, metrics):
             return (
                 {"power": chart_data.downsample(rows)},
                 "local",
-                chart_data.summarise_power(rows),
+                {"power": chart_data.summarise_power(rows)},
             )
 
-    return {}, ("unavailable" if unreachable else "empty"), None
+    return {}, ("unavailable" if unreachable else "empty"), {}
+
+
+def get_energy(settings_dict, token, device_ids, hours):
+    """
+    ({device_id: kwh_or_None, ...}, source).
+
+    source is "server" if the collector answered for at least one device,
+    "unavailable" if none of them could be reached at all (including no
+    server being configured).
+
+    This reads each device's raw power series and integrates it directly,
+    rather than going through /summary, because /summary cannot tell "no
+    rows for this device" apart from "recorded and it was genuinely zero" --
+    both come back as all-zero statistics. A device with nothing recorded
+    must report None, not 0.0: absent data and zero consumption are
+    different facts, and this is the one caller that needs to keep them
+    apart. There is no local-file fallback here either, unlike get_series:
+    the local cache only ever holds a few hours, which would silently
+    understate "today's total" for anything requested after sunrise.
+    """
+    base_url = settings_dict.get("history_server") or ""
+    timeout = settings_dict.get("history_timeout", 3)
+
+    energy = {}
+    reached = False
+    for device_id in device_ids:
+        if not base_url:
+            energy[device_id] = None
+            continue
+        rows = fetch_series(base_url, token, device_id, hours, "power", timeout)
+        if rows is None:
+            energy[device_id] = None
+            continue
+        reached = True
+        energy[device_id] = (
+            chart_data.summarise(rows, integrate=True)["kwh"] if rows else None
+        )
+
+    return energy, ("server" if reached else "unavailable")

@@ -15,6 +15,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+import chart_data
 from server import storage
 
 log = logging.getLogger("api")
@@ -131,6 +132,17 @@ def make_handler(conn, token, retention_days=365):
                     metric = (query.get("metric") or ["power"])[0]
                     rows = storage.series(request_conn, device, metric, since)
                     self._send(200, [[ts, value] for ts, value in rows])
+                elif url.path == "/summary":
+                    # Statistics must come from the raw rows, never from an
+                    # already-downsampled series: chart_data.downsample keeps
+                    # each bucket's min and max, so a plug at 10% duty would
+                    # collapse to an alternating 0/90 W series whose mean is
+                    # 45 W instead of 9 W. storage.series here returns the
+                    # same raw rows /series does, before any such reduction.
+                    metric = (query.get("metric") or ["power"])[0]
+                    rows = storage.series(request_conn, device, metric, since)
+                    stats = chart_data.summarise(list(rows), integrate=(metric == "power"))
+                    self._send(200, stats)
                 else:
                     self._send(404, {"error": "not found"})
             finally:

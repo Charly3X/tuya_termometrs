@@ -65,18 +65,28 @@ def downsample(points, buckets=500):
     return result
 
 
-def summarise_power(points):
+def summarise(points, integrate=False):
     """
-    {"min", "avg", "max", "kwh"} for [[ts, watts], ...].
+    {"min", "avg", "max", "kwh"} for [[ts, value], ...].
 
-    Energy is integrated from the power curve rather than read from the
-    device's add_ele counter, because that counter resets at midnight and so
-    cannot answer "how much over the last 24 hours".
+    kwh is the trapezoid integral of value over time when integrate is true.
+    When it is false, kwh is None rather than a number -- integrating a
+    temperature curve does not mean anything, and a silent bogus figure
+    would be worse than an explicit "not applicable".
     """
     if not points:
-        return {"min": 0.0, "avg": 0.0, "max": 0.0, "kwh": 0.0}
+        return {"min": 0.0, "avg": 0.0, "max": 0.0, "kwh": 0.0 if integrate else None}
 
     values = [point[1] for point in points]
+    result = {
+        "min": min(values),
+        "avg": sum(values) / len(values),
+        "max": max(values),
+    }
+
+    if not integrate:
+        result["kwh"] = None
+        return result
 
     joules = 0.0
     for earlier, later in zip(points, points[1:]):
@@ -84,9 +94,18 @@ def summarise_power(points):
         if 0 < seconds <= MAX_GAP_SECONDS:
             joules += (earlier[1] + later[1]) / 2 * seconds
 
-    return {
-        "min": min(values),
-        "avg": sum(values) / len(values),
-        "max": max(values),
-        "kwh": joules / 3_600_000,
-    }
+    result["kwh"] = joules / 3_600_000
+    return result
+
+
+def summarise_power(points):
+    """
+    {"min", "avg", "max", "kwh"} for [[ts, watts], ...].
+
+    Energy is integrated from the power curve rather than read from the
+    device's add_ele counter, because that counter resets at midnight and so
+    cannot answer "how much over the last 24 hours". A thin wrapper around
+    summarise(points, integrate=True) so existing callers keep working
+    unchanged.
+    """
+    return summarise(points, integrate=True)
