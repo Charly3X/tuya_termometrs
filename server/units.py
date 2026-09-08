@@ -43,6 +43,11 @@ SCALE_OVERRIDES = {
     # for ten hours at roughly half duty. 0.045 kWh would be 40 minutes of
     # running in ten hours, which is impossible for a fridge that is on.
     "add_ele": 2,
+    # Tuya declares cur_current as {"unit": "mA", "scale": 0}, so the declared
+    # scale is not wrong -- it just yields milliamps, and the `current` column
+    # is amperes like every other column here is a human unit (W, V, A, kWh,
+    # °C, %). 353 mA must be stored as 0.353 A, so divide by 1000.
+    "cur_current": 3,
 }
 
 BATTERY_STATE = {"low": 10.0, "middle": 40.0, "high": 80.0}
