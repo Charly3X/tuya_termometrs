@@ -137,7 +137,8 @@ This will display all your devices with their local keys and IPs.
 
 **Step 2: Add Local Configuration**
 
-Add `local_devices` and `local_socket` sections to `config.json`:
+Add `local_devices` and `local_sockets` sections to `config.json` (see
+`config.json.example` for the full template, including comments):
 
 ```json
 {
@@ -169,19 +170,39 @@ Add `local_devices` and `local_socket` sections to `config.json`:
             "version": "3.3"
         }
     ],
-    "local_socket": {
-        "id": "SOCKET_DEVICE_ID",
-        "name": "Smart Plug",
-        "ip": "192.168.1.103",
-        "local_key": "SOCKET_LOCAL_KEY",
-        "version": "3.3"
-    }
+    "local_sockets": [
+        {
+            "id": "SOCKET_DEVICE_ID",
+            "name": "Smart Plug",
+            "ip": "192.168.1.103",
+            "local_key": "SOCKET_LOCAL_KEY",
+            "version": "3.3"
+        }
+    ]
 }
 ```
+
+`local_sockets` is plural and a list, even for a single plug — both the
+widget and the Oracle collector (see below) read only the plural key, so a
+lone singular `local_socket` object leaves the collector monitoring nothing.
 
 **Step 3: Switch to Local Mode**
 
 Right-click widget → **Configure** → **Connection mode** → Select **"Local Network"**
+
+### Optional: server-side history
+
+If you also run the Oracle collector service (a separate 24/7 process that
+records readings and serves the widget's chart), `config.json` additionally
+needs `history_token` — a shared secret, generated once and copied verbatim
+into both the server's and the desktop's `config.json`:
+
+```bash
+./venv/bin/python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+Setting up and deploying that service is out of scope for this file — see
+[`server/README.md`](server/README.md) for the full walkthrough.
 
 **Local Mode Benefits:**
 - ⚡ Faster response (no cloud roundtrip)
