@@ -2,11 +2,13 @@
     "region": "eu",
     "cloud_backend": "sharing",
 
-    "history_server": "http://SERVER_IP:8080",
+    "_comment_history_server": "Desktop only. Set it to http://SERVER_IP:8080 on the machine running the widget. Leave it empty on the server, and empty on any desktop without a collector — a wrong or unreachable address costs the history_timeout on every chart open before the local fallback takes over.",
+    "history_server": "",
     "history_timeout": 3,
 
+    "_comment_server": "Server only. The desktop ignores this block.",
     "server": {
-        "database": "/var/lib/tuya/readings.db",
+        "database": "/opt/tuya/readings.db",
         "port": 8080,
         "retention_days": 365,
         "poll_interval": 900

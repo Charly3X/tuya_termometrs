@@ -26,8 +26,14 @@ sudo -u tuya cp settings.json.example settings.json
 sudo -u tuya cp config.json.example config.json
 ```
 
-Edit `settings.json`: set `server.database` to `/opt/tuya/readings.db`.
-Edit `config.json`: fill in the device ids, and generate the API token:
+`settings.json` needs no edits on the server: `server.database` already points
+at `/opt/tuya/readings.db`, and `history_server` is deliberately empty — that
+one is for the desktop, which fills in `http://SERVER_IP:8080` so the widget
+pulls its chart from here. Leaving it set on the server, or on a desktop with
+no collector, only buys a `history_timeout` wait before the local fallback.
+
+Edit `config.json`: fill in the device ids and `local_sockets`, and generate
+the API token:
 
 ```bash
 ./venv/bin/python3 -c "import secrets; print(secrets.token_urlsafe(32))"
@@ -105,6 +111,12 @@ Check from the desktop:
 curl -H "Authorization: Bearer <token>" \
   "http://<server-ip>:8080/history?device=<socket-id>&hours=1"
 ```
+
+## Gaps in the data are normal
+
+Tuya pushes only the data points whose value actually changed, so a plug
+sitting at a constant load produces no `power` rows at all until the load
+moves. Absence of rows means unchanged, not offline.
 
 ## Nightly retention
 
