@@ -239,7 +239,7 @@ def get_sharing_temperatures(config, log_func=None):
 
 
 def _parse_socket(status):
-    result = {"power": "--", "voltage": "--", "energy": "--"}
+    result = {"power": "--", "voltage": "--", "energy_increment": "--"}
 
     for code, value in status.items():
         if not isinstance(value, (int, float)):
@@ -249,12 +249,18 @@ def _parse_socket(status):
         elif code == "cur_voltage":
             result["voltage"] = f"{value / 10:.0f}"
         elif code == "add_ele":
+            # add_ele is an increment since the previous report, not a
+            # running total -- consecutive readings on the live account go
+            # 0.46, 0.46, 0.13, 0.01. For today's actual total consumption
+            # see the "energy" CLI mode (tuya_client.py mode == "energy",
+            # backed by history_client.get_energy).
+            #
             # Tuya declares scale 3 for add_ele, but this hardware reports
             # 0.01 kWh units, so the declared scale is deliberately not used.
             # Measured 2026-09-08 against the plug; the local path
             # (tuya_local.py DPS 20) and server/units.py SCALE_OVERRIDES
             # agree on /100. Do not "correct" this to /1000: it reads 10x low.
-            result["energy"] = f"{value / 100:.2f}"
+            result["energy_increment"] = f"{value / 100:.2f}"
 
     return result
 

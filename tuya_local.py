@@ -177,9 +177,9 @@ def parse_socket_status(status):
         status: device status dict from tinytuya
     
     Returns:
-        dict with power, voltage, energy
+        dict with power, voltage, energy_increment
     """
-    result = {"power": "--", "voltage": "--", "energy": "--"}
+    result = {"power": "--", "voltage": "--", "energy_increment": "--"}
     
     if not status or 'dps' not in status:
         return result
@@ -189,21 +189,27 @@ def parse_socket_status(status):
     # DPS code mapping (varies by device model):
     #
     # Standard mapping:
-    # DPS 17: energy add_ele (0.01 kWh; Tuya declares scale 3, i.e. 0.001 kWh,
-    #         but the hardware disagrees with its own declared spec -- same
-    #         conclusion as tuya_sharing_api.py's add_ele and
+    # DPS 17: energy_increment, add_ele (0.01 kWh; Tuya declares scale 3, i.e.
+    #         0.001 kWh, but the hardware disagrees with its own declared spec
+    #         -- same conclusion as tuya_sharing_api.py's add_ele and
     #         server/units.py's SCALE_OVERRIDES, measured 2026-09-08. Do not
     #         "correct" this to /1000, it reads 10x low.)
     # DPS 18: current (mA)
     # DPS 19: power (0.1W)
     # DPS 20: voltage (0.1V)
-    # DPS 101: energy (0.001 kWh)
+    # DPS 101: energy_increment (0.001 kWh)
     #
     # T34-Smart Plug+ mapping:
-    # DPS 20: energy add_ele (0.01 kWh)
+    # DPS 20: energy_increment, add_ele (0.01 kWh)
     # DPS 21: current cur_current (mA)
     # DPS 22: power cur_power (0.1W)
     # DPS 23: voltage cur_voltage (0.1V)
+    #
+    # add_ele is an increment since the previous report, not a running total
+    # -- consecutive readings on the live account go 0.46, 0.46, 0.13, 0.01.
+    # For today's actual total consumption, see the "energy" CLI mode
+    # (tuya_client.py mode == "energy", backed by history_client.get_energy),
+    # which integrates the power curve instead.
     
     for key, value in dps.items():
         key_str = str(key)
@@ -212,25 +218,25 @@ def parse_socket_status(status):
             if isinstance(value, (int, float)):
                 result["power"] = f"{value / 10:.1f}"
         
-        elif key_str in ['20', '6']:  # Voltage (0.1V) OR Energy (0.01 kWh)
+        elif key_str in ['20', '6']:  # Voltage (0.1V) OR Energy increment (0.01 kWh)
             if isinstance(value, (int, float)):
                 # Check if this looks like voltage (>1000) or energy (<1000)
                 if value > 1000:
                     result["voltage"] = f"{value / 10:.0f}"
                 else:
-                    result["energy"] = f"{value / 100:.2f}"
-        
+                    result["energy_increment"] = f"{value / 100:.2f}"
+
         elif key_str in ['23']:  # Voltage for T34-Smart Plug+ (0.1V)
             if isinstance(value, (int, float)):
                 result["voltage"] = f"{value / 10:.0f}"
-        
-        elif key_str in ['101']:  # Energy (0.001 kWh)
-            if isinstance(value, (int, float)):
-                result["energy"] = f"{value / 1000:.2f}"
 
-        elif key_str in ['17']:  # Energy add_ele, standard mapping (0.01 kWh -- see header comment)
+        elif key_str in ['101']:  # Energy increment (0.001 kWh)
             if isinstance(value, (int, float)):
-                result["energy"] = f"{value / 100:.2f}"
+                result["energy_increment"] = f"{value / 1000:.2f}"
+
+        elif key_str in ['17']:  # Energy increment add_ele, standard mapping (0.01 kWh -- see header comment)
+            if isinstance(value, (int, float)):
+                result["energy_increment"] = f"{value / 100:.2f}"
     
     return result
 

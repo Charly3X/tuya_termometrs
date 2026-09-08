@@ -267,20 +267,20 @@ def get_socket_data():
             log_api_call(f"SHARING ERROR: {str(e)}, falling back to IoT Core")
 
     if not config or "socket" not in config:
-        return {"socket": {"name": "", "power": "--", "voltage": "--", "energy": "--"}}
+        return {"socket": {"name": "", "power": "--", "voltage": "--", "energy_increment": "--"}}
 
     cloud, device_map = get_cloud_and_device_map(config)
     socket_id = config["socket"]
-    
+
     log_api_call(f"API CALL: status request for socket {socket_id[:8]}")
     batch_response = cloud.cloudrequest(
         f'/v1.0/iot-03/devices/status?device_ids={socket_id}',
         action='GET'
     )
     log_api_call(f"RESPONSE: {json.dumps(batch_response)}")
-    
-    socket_data = {"name": device_map.get(socket_id, "Socket"), "power": "--", "voltage": "--", "energy": "--"}
-    
+
+    socket_data = {"name": device_map.get(socket_id, "Socket"), "power": "--", "voltage": "--", "energy_increment": "--"}
+
     if batch_response.get("success") and batch_response.get("result"):
         status_list = batch_response["result"][0].get("status", [])
         for item in status_list:
@@ -289,12 +289,18 @@ def get_socket_data():
             elif item["code"] == "cur_voltage":
                 socket_data["voltage"] = f"{item['value'] / 10:.0f}"
             elif item["code"] == "add_ele":
+                # add_ele is an increment since the previous report, not a
+                # running total -- consecutive readings on the live account
+                # go 0.46, 0.46, 0.13, 0.01. For today's actual total
+                # consumption see the "energy" CLI mode (mode == "energy"
+                # below, backed by history_client.get_energy).
+                #
                 # Tuya declares scale 3 for add_ele, but this hardware reports
                 # 0.01 kWh units, so the declared scale is deliberately not
                 # used. Measured 2026-09-08 against the plug itself; see
                 # server/units.py SCALE_OVERRIDES. Do not "correct" this to
                 # /1000 -- that reads 10x low.
-                socket_data["energy"] = f"{item['value'] / 100:.2f}"
+                socket_data["energy_increment"] = f"{item['value'] / 100:.2f}"
 
     return {"socket": socket_data}
 
@@ -394,12 +400,12 @@ def get_all_data():
             batteries.append(0)
     
     # Get socket data from batch response
-    socket_data = {"name": "", "power": "--", "voltage": "--", "energy": "--"}
+    socket_data = {"name": "", "power": "--", "voltage": "--", "energy_increment": "--"}
     if "socket" in config:
         try:
             socket_id = config["socket"]
             socket_data["name"] = device_map.get(socket_id, "Socket")
-            
+
             # Use data from batch response
             status_list = status_map.get(socket_id, [])
             for item in status_list:
@@ -408,10 +414,16 @@ def get_all_data():
                 elif item["code"] == "cur_voltage":
                     socket_data["voltage"] = f"{item['value'] / 10:.0f}"
                 elif item["code"] == "add_ele":
+                    # add_ele is an increment since the previous report, not a
+                    # running total -- consecutive readings on the live
+                    # account go 0.46, 0.46, 0.13, 0.01. For today's actual
+                    # total consumption see the "energy" CLI mode (mode ==
+                    # "energy" below, backed by history_client.get_energy).
+                    #
                     # Tuya declares scale 3, but this hardware reports 0.01 kWh
                     # units, so the declared scale is deliberately not used.
                     # See server/units.py SCALE_OVERRIDES. /1000 reads 10x low.
-                    socket_data["energy"] = f"{item['value'] / 100:.2f}"
+                    socket_data["energy_increment"] = f"{item['value'] / 100:.2f}"
         except Exception as e:
             pass
     
