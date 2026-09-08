@@ -1,0 +1,17 @@
+[Unit]
+Description=Tuya collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tuya
+WorkingDirectory=/opt/tuya
+ExecStart=/opt/tuya/venv/bin/python3 -m server.collector
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

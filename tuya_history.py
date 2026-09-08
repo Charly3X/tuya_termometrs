@@ -8,7 +8,13 @@ from pathlib import Path
 from datetime import datetime, timedelta
 
 HISTORY_FILE = Path(__file__).parent / "power_history.json"
-MAX_ENTRIES_PER_DEVICE = 8640  # 24h at 10-second intervals
+
+# Emergency cache only -- the server is the source of truth. Sized in hours
+# rather than entries because the poll interval has changed before: the old
+# 8640 was labelled "24h at 10s" but the widget polls every 7s, so it actually
+# held about 17 hours and the 24h chart button quietly showed less than a day.
+LOCAL_HISTORY_HOURS = 6
+MAX_ENTRIES_PER_DEVICE = LOCAL_HISTORY_HOURS * 3600 // 5  # 5s floor on polling
 
 
 def load_history():

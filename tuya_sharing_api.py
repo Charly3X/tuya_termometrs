@@ -74,13 +74,6 @@ def save_session(session):
     SESSION_FILE.chmod(0o600)
 
 
-def is_available(config):
-    """True when the sharing backend is configured and authenticated."""
-    if config.get("cloud_backend", "sharing") != "sharing":
-        return False
-    return load_session() is not None
-
-
 class _TokenListener(SharingTokenListener):
     """Persists rotated tokens so the next widget refresh reuses them."""
 
@@ -255,7 +248,12 @@ def _parse_socket(status):
         elif code == "cur_voltage":
             result["voltage"] = f"{value / 10:.0f}"
         elif code == "add_ele":
-            result["energy"] = f"{value / 1000:.2f}"
+            # Tuya declares scale 3 for add_ele, but this hardware reports
+            # 0.01 kWh units, so the declared scale is deliberately not used.
+            # Measured 2026-09-08 against the plug; the local path
+            # (tuya_local.py DPS 20) and server/units.py SCALE_OVERRIDES
+            # agree on /100. Do not "correct" this to /1000: it reads 10x low.
+            result["energy"] = f"{value / 100:.2f}"
 
     return result
 

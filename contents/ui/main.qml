@@ -21,6 +21,7 @@ PlasmoidItem {
     property string chartDeviceId: ""
     property string chartDeviceName: ""
     property var chartData: []
+    property string chartSource: "server"
     property int chartPeriod: 1
     property bool chartVisible: false
     
@@ -92,6 +93,7 @@ PlasmoidItem {
                         // Only update chart if data is for the currently selected device
                         if (!result.history_device || result.history_device === chartDeviceId) {
                             chartData = result.history
+                            chartSource = result.history_source || "server"
                             chartCanvas.requestPaint()
                         }
                     }
@@ -512,6 +514,14 @@ PlasmoidItem {
                             }
                         }
                         
+                        PlasmaComponents.Label {
+                            Layout.alignment: Qt.AlignHCenter
+                            visible: chartSource === "local"
+                            text: "локальные данные, сервер недоступен"
+                            font.pixelSize: 10
+                            color: "#fbbf24"
+                        }
+
                         // Period selector
                         RowLayout {
                             Layout.alignment: Qt.AlignHCenter

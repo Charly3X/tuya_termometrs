@@ -14,3 +14,10 @@ tinytuya.json
 snapshot.json
 sharing_token.json
 ip_cache.json
+readings.db
+readings.db-wal
+readings.db-shm
+.superpowers/
+.claude/worktrees/
+settings.json
+venv

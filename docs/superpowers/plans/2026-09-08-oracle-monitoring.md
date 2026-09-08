@@ -616,10 +616,19 @@ def power_series(conn, device, since_ts):
     carried forward instead of dropping power points that have no voltage
     at the same timestamp.
     """
+    # The CASE is not decoration. write() stores one row per metric, so a
+    # report carrying both power and voltage produces two rows with the SAME
+    # ts. Under a plain "ORDER BY ts" SQLite probes the index once per value of
+    # the IN list -- 'power' first -- and the stable sort then leaves the power
+    # row ahead of the voltage row it should have been paired with, so that
+    # reading carries a stale voltage. Verified: the plain version fails
+    # test_power_series_carries_the_last_voltage_forward, returning
+    # [100, 10.0, 0.0] instead of [100, 10.0, 230.0]. The explicit tie-break
+    # fixes it deterministically rather than relying on rowid order.
     rows = conn.execute(
         "SELECT ts, metric, value FROM readings "
         "WHERE device = ? AND metric IN ('power', 'voltage') AND ts >= ? "
-        "ORDER BY ts",
+        "ORDER BY ts, CASE WHEN metric = 'voltage' THEN 0 ELSE 1 END",
         (device, since_ts),
     )
 
@@ -839,7 +848,7 @@ if __name__ == "__main__":
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `./venv/bin/python3 -m pytest tests/test_prune.py -v`
-Expected: 6 passed
+Expected: 5 passed
 
 - [ ] **Step 5: Commit**
 
@@ -1104,6 +1113,42 @@ def test_shadow_properties_are_recorded_with_their_own_timestamps(conn):
 def test_shadow_property_without_a_timestamp_is_skipped(conn):
     collector.record_shadow(conn, "dev2", [{"code": "temp_current", "value": 244}], SCALES)
     assert storage.series(conn, "dev2", "temperature", 0) == []
+
+
+def test_push_listener_writes_from_the_mqtt_thread(tmp_path):
+    """
+    The regression guard for the defect that cost this task a fix round.
+
+    paho-mqtt calls update_device on its own thread. A sqlite3 connection
+    created on the main thread cannot be used there, so a listener sharing the
+    collector's connection wrote nothing while looking healthy. Driving the
+    write from a real second thread is the only way to catch that -- calling
+    the listener on the main thread passes against the broken design too.
+    """
+    import threading
+
+    database = tmp_path / "t.db"
+    listener = collector._PushListener(str(database), {"dev1": SCALES})
+
+    class FakeDevice:
+        id = "dev1"
+        name = "socket"
+        status = {"cur_power": 909}
+
+    thread = threading.Thread(
+        target=lambda: listener.update_device(FakeDevice(), ["cur_power"])
+    )
+    thread.start()
+    thread.join()
+
+    # update_device logs and swallows its exceptions, so a raised error would
+    # never reach this thread. The written row is the only honest evidence.
+    conn = storage.connect(database)
+    rows = storage.series(conn, "dev1", "power", 0)
+    conn.close()
+
+    assert len(rows) == 1
+    assert rows[0][1] == 90.9
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -1127,6 +1172,7 @@ in Tuya's catalog cannot be decoded from the push, so they are polled through
 the shadow endpoint instead.
 """
 import logging
+import threading
 import time
 
 import tuya_sharing_api
@@ -1172,9 +1218,34 @@ def record_shadow(conn, device_id, properties, scales):
 
 
 class _PushListener(SharingDeviceListener):
-    def __init__(self, conn, scales):
-        self.conn = conn
+    """
+    Holds its own database connection, opened lazily on whichever thread
+    first uses it.
+
+    paho-mqtt dispatches callbacks on its own thread, and a sqlite3 connection
+    may only be used on the thread that created it. Sharing the collector's
+    main connection here raises ProgrammingError on every push write, which
+    loses all socket power data while shadow-polled sensors keep recording --
+    so the collector looks half-alive instead of broken. Measured before this
+    was fixed: 27 push callbacks arrived, 0 rows were written.
+
+    Two connections against a WAL database is the case WAL exists for.
+    Do not "simplify" this to check_same_thread=False on one shared
+    connection: that removes the guard without removing the hazard, since two
+    threads would then interleave commits.
+    """
+
+    def __init__(self, database, scales):
+        self.database = database
         self.scales = scales
+        self._local = threading.local()
+
+    def _conn(self):
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            conn = storage.connect(self.database)
+            self._local.conn = conn
+        return conn
 
     def update_device(self, device, updated_status_properties=None, dp_timestamps=None):
         if not updated_status_properties:
@@ -1182,7 +1253,7 @@ class _PushListener(SharingDeviceListener):
         status = {c: device.status.get(c) for c in updated_status_properties}
         scales = self.scales.get(device.id, {})
         try:
-            record(self.conn, device.id, status, scales, int(time.time()))
+            record(self._conn(), device.id, status, scales, int(time.time()))
         except Exception as e:
             log.error("failed to record push from %s: %s", device.id, e)
 
@@ -1193,7 +1264,7 @@ class _PushListener(SharingDeviceListener):
         pass
 
 
-def start_push(manager, conn, scales):
+def start_push(manager, database, scales):
     """
     Subscribe to device topics directly.
 
@@ -1202,7 +1273,7 @@ def start_push(manager, conn, scales):
     so it delivers nothing. Measured: 0 events in 90s through refresh_mq,
     27 events in 90s through this path.
     """
-    manager.add_device_listener(_PushListener(conn, scales))
+    manager.add_device_listener(_PushListener(database, scales))
     mq = SharingMQ(
         manager.customer_api,
         [home.id for home in manager.user_homes],
@@ -1248,7 +1319,7 @@ def run(settings_dict, device_ids):
         tuya_sharing_api._TokenListener(session),
     )
     manager.update_device_cache()
-    start_push(manager, conn, scales)
+    start_push(manager, settings_dict["server"]["database"], scales)
 
     interval = settings_dict["server"]["poll_interval"]
     while True:
@@ -1312,6 +1383,26 @@ git commit -m "Add collector service using MQTT push and shadow polling"
 **Interfaces:**
 - Consumes: `storage.power_series`, `storage.series`.
 - Produces: `api.make_handler(conn, token) -> class` and `api.serve(conn, token, port) -> None`.
+
+> **The code below is the original plan and is known to be defective. The
+> committed `server/api.py` is authoritative.** Three faults were found by
+> running it, all fixed during execution:
+> 1. It shares one sqlite3 connection across `ThreadingHTTPServer`'s
+>    per-request threads, which sqlite3 forbids — the same cross-thread
+>    mistake as the collector in Task 6. The implementation opens a
+>    short-lived connection per request instead.
+> 2. `_authorised` lets `Authorization: Bearer ` through when the configured
+>    token is empty, because `compare_digest("", "")` is true. The
+>    implementation refuses to construct the handler at all on a falsy token.
+> 3. `int(hours)` on untrusted input kills the handler thread. The
+>    implementation rejects non-numeric, non-positive and non-finite values
+>    with 400, and clamps a `since` that would overflow SQLite's 64-bit
+>    integer column. Note that `float()` accepts `"nan"` and `"inf"`, which
+>    is how the second round of this fix was needed.
+>
+> The two "return everything" tests below also cannot pass as written:
+> `hours=99999` reaches back about eleven years, while the fixture
+> timestamps sit near the Unix epoch.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1681,7 +1772,7 @@ def get_history(settings_dict, token, device_id, hours):
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `./venv/bin/python3 -m pytest tests/test_history_client.py -v`
-Expected: 3 passed
+Expected: 5 passed
 
 - [ ] **Step 5: Wire it into the widget entry point**
 
@@ -1768,18 +1859,32 @@ Add a warning label inside the chart area, directly above the period selector
 Run: `./venv/bin/python3 tuya_client.py history bf973442af478b5404fupa 1`
 Expected: the same chart rows as before, plus `"history_source": "local"`
 
-- [ ] **Step 9: Install the QML change and restart the shell**
+- [ ] **Step 9: Check the QML edit without installing it**
 
-This is the one task in the plan that touches QML, so unlike every other task
-it needs the widget reinstalled:
+Do **not** copy the QML into the plasmoid and do **not** restart plasmashell.
+Two reasons: this work happens in a git worktree while `main.qml` hardcodes
+`/home/charoyan/projects/tuya/...`, so an installed copy would run the main
+checkout's Python and prove nothing; and restarting the shell disturbs a
+desktop that is in use. The owner installs and eyeballs it after the merge.
+
+Verify the edit is syntactically valid instead:
 
 ```bash
-cp contents/ui/main.qml ~/.local/share/plasma/plasmoids/org.kde.plasma.tuya/contents/ui/main.qml
-killall plasmashell && sleep 2 && nohup plasmashell &
+qmllint contents/ui/main.qml 2>&1 | grep -v "^Warning.*import" || true
 ```
 
-Click a socket in the widget. Expected: the chart draws, with the amber
-"локальные данные" line visible while no server is configured.
+If `qmllint` is not installed, check the braces balance instead:
+
+```bash
+./venv/bin/python3 -c "
+src = open('contents/ui/main.qml').read()
+assert src.count('{') == src.count('}'), 'unbalanced braces'
+assert 'chartSource' in src and 'history_source' in src
+print('QML edit looks structurally sound')
+"
+```
+
+Expected: no syntax complaints, and the check prints its confirmation.
 
 - [ ] **Step 10: Commit**
 
@@ -1903,19 +2008,43 @@ git commit -m "Add one-off import of the legacy history file"
 ### Task 10: Deployment
 
 **Files:**
-- Create: `server/systemd/tuya-collector.service`, `server/systemd/tuya-api.service`, `server/README.md`
+- Create: `pytest.ini`, `server/systemd/tuya-collector.service`, `server/systemd/tuya-api.service`, `server/README.md`
 - Modify: `AGENTS.md`
 
 **Interfaces:**
 - Consumes: everything above.
 - Produces: nothing consumed by other tasks.
 
-- [ ] **Step 1: Run the whole suite**
+- [ ] **Step 1: Stop bare `pytest` from detonating**
+
+`test_region.py` and `test_statistics.py` sit at the repository root. They are
+hand-run diagnostic scripts, not pytest tests, and `test_statistics.py` calls
+`exit(1)` at import time — so a bare `pytest` from the root dies with
+INTERNALERROR before running anything. Every command in this plan passes
+`tests/` explicitly and so dodges it, but the next person will not know that.
+
+Create `pytest.ini`:
+
+```ini
+[pytest]
+testpaths = tests
+```
+
+Verify both invocations now work:
+
+```bash
+./venv/bin/python3 -m pytest -q
+./venv/bin/python3 -m pytest tests/ -q
+```
+
+Expected: both collect the same tests and pass. Neither reports INTERNALERROR.
+
+- [ ] **Step 2: Run the whole suite**
 
 Run: `./venv/bin/python3 -m pytest tests/ -v`
-Expected: all tests pass, 56 total
+Expected: all tests pass, 55 total
 
-- [ ] **Step 2: Write the collector unit**
+- [ ] **Step 3: Write the collector unit**
 
 Create `server/systemd/tuya-collector.service`:
 
@@ -1939,7 +2068,7 @@ StandardError=journal
 WantedBy=multi-user.target
 ```
 
-- [ ] **Step 3: Write the API unit**
+- [ ] **Step 4: Write the API unit**
 
 Create `server/systemd/tuya-api.service`:
 
@@ -1963,7 +2092,7 @@ StandardError=journal
 WantedBy=multi-user.target
 ```
 
-- [ ] **Step 4: Write the deployment guide**
+- [ ] **Step 5: Write the deployment guide**
 
 Create `server/README.md`:
 
@@ -2079,7 +2208,7 @@ Dry run first — this is the default:
 Add `--yes` to actually delete, `--device` or `--metric` to narrow it.
 ````
 
-- [ ] **Step 5: Point AGENTS.md at the server**
+- [ ] **Step 6: Point AGENTS.md at the server**
 
 Append to the "Repository layout" section of `AGENTS.md`:
 
@@ -2094,10 +2223,10 @@ Append to the "Repository layout" section of `AGENTS.md`:
   - `settings.json` is gitignored; `settings.json.example` is the template.
 ```
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add server/systemd server/README.md AGENTS.md
+git add pytest.ini server/systemd server/README.md AGENTS.md
 git commit -m "Add systemd units and server deployment guide"
 ```
 

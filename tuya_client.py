@@ -10,8 +10,10 @@ from tuya_local import (
     get_local_all_data,
     log_local_call
 )
-from tuya_history import add_readings, get_device_history
+from tuya_history import add_readings
 import tuya_sharing_api
+import history_client
+from settings import load_settings
 
 CONFIG_FILE = Path(__file__).parent / "config.json"
 OUTPUT_FILE = Path(__file__).parent / "data.json"
@@ -160,13 +162,14 @@ def use_sharing_backend(config):
     Whether to read the cloud through the Smart Life sharing SDK.
 
     Preferred over tinytuya.Cloud because it does not need an IoT Core
-    subscription. Set "cloud_backend": "iot_core" in config.json to force the
-    old path.
+    subscription. Set "cloud_backend": "iot_core" in settings.json to force
+    the old path.
     """
     if not config:
         return False
     try:
-        return tuya_sharing_api.is_available(config)
+        backend = load_settings().get("cloud_backend", "sharing")
+        return backend == "sharing" and tuya_sharing_api.load_session() is not None
     except Exception:
         return False
 
@@ -286,8 +289,13 @@ def get_socket_data():
             elif item["code"] == "cur_voltage":
                 socket_data["voltage"] = f"{item['value'] / 10:.0f}"
             elif item["code"] == "add_ele":
-                socket_data["energy"] = f"{item['value'] / 1000:.2f}"
-    
+                # Tuya declares scale 3 for add_ele, but this hardware reports
+                # 0.01 kWh units, so the declared scale is deliberately not
+                # used. Measured 2026-09-08 against the plug itself; see
+                # server/units.py SCALE_OVERRIDES. Do not "correct" this to
+                # /1000 -- that reads 10x low.
+                socket_data["energy"] = f"{item['value'] / 100:.2f}"
+
     return {"socket": socket_data}
 
 def get_all_data():
@@ -400,7 +408,10 @@ def get_all_data():
                 elif item["code"] == "cur_voltage":
                     socket_data["voltage"] = f"{item['value'] / 10:.0f}"
                 elif item["code"] == "add_ele":
-                    socket_data["energy"] = f"{item['value'] / 1000:.2f}"
+                    # Tuya declares scale 3, but this hardware reports 0.01 kWh
+                    # units, so the declared scale is deliberately not used.
+                    # See server/units.py SCALE_OVERRIDES. /1000 reads 10x low.
+                    socket_data["energy"] = f"{item['value'] / 100:.2f}"
         except Exception as e:
             pass
     
@@ -418,8 +429,16 @@ if __name__ == "__main__":
     if mode == "history":
         device_id = args[1] if len(args) > 1 else ""
         hours = int(args[2]) if len(args) > 2 else 1
-        history = get_device_history(device_id, hours)
-        print(json.dumps({"history": history, "history_device": device_id}))
+        app_settings = load_settings()
+        token = (load_config() or {}).get("history_token", "")
+        history, source = history_client.get_history(
+            app_settings, token, device_id, hours
+        )
+        print(json.dumps({
+            "history": history,
+            "history_device": device_id,
+            "history_source": source,
+        }))
         sys.exit(0)
     
     # Load config
