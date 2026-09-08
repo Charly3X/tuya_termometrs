@@ -113,16 +113,24 @@ sudo -u tuya crontab -e
 ```
 
 ```
-17 4 * * * /opt/tuya/venv/bin/python3 -m server.prune --database /opt/tuya/readings.db --older-than-days 365 --yes
+17 4 * * * cd /opt/tuya && /opt/tuya/venv/bin/python3 -m server.prune --database /opt/tuya/readings.db --yes
 ```
+
+The age comes from `server.retention_days` in `settings.json`, so change it
+there rather than in the cron line. This run does not `VACUUM`: in steady
+state it deletes about as much as the collector inserts, so there is nothing
+to reclaim, and vacuuming a multi-gigabyte database holds an exclusive lock
+long enough for the collector's writes to time out and be lost.
 
 ## Deleting a period by hand
 
 Dry run first — this is the default:
 
 ```bash
-./venv/bin/python3 -m server.prune --database readings.db \
-  --from 2026-09-01 --to 2026-09-03
+sudo -u tuya /opt/tuya/venv/bin/python3 -m server.prune \
+  --database /opt/tuya/readings.db --from 2026-09-01 --to 2026-09-03
 ```
 
-Add `--yes` to actually delete, `--device` or `--metric` to narrow it.
+Add `--yes` to actually delete, `--device` or `--metric` to narrow it. Unlike
+the nightly run, this one vacuums afterwards, so the freed space actually
+returns to the filesystem.
