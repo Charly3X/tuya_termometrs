@@ -167,6 +167,18 @@ def test_second_heartbeat_immediately_after_the_first_writes_nothing(conn):
     assert storage.series(conn, "dev1", "power", 0) == [(now, 42.0)]
 
 
+def test_heartbeat_treats_a_non_boolean_online_value_as_offline(conn):
+    # `online` may be built from whatever a caller has lying around; a
+    # truthy-but-not-True value (a stray string, a 1, ...) must not slip
+    # through the gate the way a plain `if not is_online` check would let
+    # it, since e.g. "yes" and 1 are both truthy in Python.
+    last_values = {("dev1", "power"): [100, 42.0]}
+    online = {"dev1": "yes"}
+    written = collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_SECONDS)
+    assert written == 0
+    assert storage.series(conn, "dev1", "power", 0) == []
+
+
 def test_record_populates_last_values_so_a_push_resets_the_clock(conn):
     last_values = {}
     collector.record(conn, "dev1", {"cur_power": 909}, SCALES, 100, last_values)
@@ -311,3 +323,81 @@ def test_run_builds_exactly_one_tuya_session(monkeypatch, tmp_path):
     assert start_push_calls == [manager]
     # prefer_ipv4() must run before the network session (Manager) is built.
     assert order == ["prefer_ipv4", "manager_init"]
+
+
+def test_run_polls_shadow_only_once_per_poll_interval(monkeypatch, tmp_path):
+    """
+    Regression test for an off-by-one in the `last_poll` comparison inside
+    run()'s loop. The loop now ticks every HEARTBEAT_SECONDS (60s) and only
+    re-polls the shadow endpoint once poll_interval (900s here) has actually
+    elapsed -- a single wrong comparison (e.g. `>` instead of `>=`, or
+    comparing against `now` instead of `last_poll`) would make it re-poll on
+    every tick instead, fifteen times more often, and
+    test_run_builds_exactly_one_tuya_session would not catch it: that test
+    only exercises the very first iteration.
+
+    900 is an exact multiple of HEARTBEAT_SECONDS (15 x 60), so with the
+    first poll firing unconditionally on tick 1 (last_poll is None), the
+    next one is due exactly when 15 more 60s ticks have elapsed -- tick 16.
+    Both time.time() and time.sleep() are faked so the 16 ticks this drives
+    through are instant instead of a 15-minute real wait.
+    """
+    monkeypatch.setattr(tuya_sharing_api, "load_session", lambda: FAKE_SESSION)
+    monkeypatch.setattr(tuya_sharing_api, "prefer_ipv4", lambda: None)
+
+    def fake_get_api(*args, **kwargs):
+        raise AssertionError("second session")
+
+    monkeypatch.setattr(tuya_sharing_api, "get_api", fake_get_api)
+
+    class _FakeManager:
+        def __init__(self, *args, **kwargs):
+            self.customer_api = object()
+            self.user_homes = []
+            self.device_map = {}
+
+        def update_device_cache(self):
+            pass
+
+    monkeypatch.setattr(collector, "Manager", _FakeManager)
+
+    def fake_classify(api, device_ids):
+        return list(device_ids), list(device_ids), {d: {} for d in device_ids}
+
+    monkeypatch.setattr(collector.roles, "classify", fake_classify)
+    monkeypatch.setattr(
+        collector, "start_push", lambda manager, database, scales, last_values=None: None
+    )
+
+    poll_once_calls = []
+
+    def fake_poll_once(api, conn, device_ids, scales, seen=None, last_values=None):
+        poll_once_calls.append(1)
+
+    monkeypatch.setattr(collector, "poll_once", fake_poll_once)
+
+    fake_now = [1_000_000]
+    monkeypatch.setattr(collector.time, "time", lambda: fake_now[0])
+
+    ticks = [0]
+
+    def fake_sleep(seconds):
+        ticks[0] += 1
+        fake_now[0] += seconds
+        if ticks[0] >= 16:
+            raise _LoopBroken()
+
+    monkeypatch.setattr(collector.time, "sleep", fake_sleep)
+
+    settings_dict = {
+        "server": {"database": str(tmp_path / "collector.db"), "poll_interval": 900},
+    }
+
+    with pytest.raises(_LoopBroken):
+        collector.run(settings_dict, ["dev1"])
+
+    # Tick 1 polls (startup). Ticks 2-15 must be skipped (900s not yet
+    # elapsed). Tick 16 polls again (exactly 900s after tick 1). Two calls
+    # total across all 16 ticks -- not 1 (poll never repeats) and not 16
+    # (poll fires every tick).
+    assert len(poll_once_calls) == 2

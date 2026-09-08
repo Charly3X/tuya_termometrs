@@ -107,7 +107,10 @@ def heartbeat(conn, last_values, online, now):
     a sound basis for "unchanged" -- but silence from an OFFLINE (or unknown)
     device means "unknown", and writing anything then would be a lie. Devices
     missing from `online`, or mapped to False, are therefore skipped
-    entirely, even if their last value is stale.
+    entirely, even if their last value is stale. The gate checks `is True`
+    rather than truthiness: `online` is built from whatever a caller passes,
+    and a non-boolean value (a stray string, an int) must not be mistaken
+    for "online" either.
 
     `last_values` is the same {(device_id, metric): [ts, value]} map that
     record() and record_shadow() populate, mutated in place here too so the
@@ -119,7 +122,7 @@ def heartbeat(conn, last_values, online, now):
     written = 0
     with _last_values_lock:
         for device_id, is_online in online.items():
-            if not is_online:
+            if is_online is not True:
                 continue
             for metric in HEARTBEAT_METRICS:
                 entry = last_values.get((device_id, metric))
@@ -274,13 +277,29 @@ def run(settings_dict, device_ids):
     last_poll = None
     while True:
         now = int(time.time())
-        # Read online state straight from the SDK's own bookkeeping rather
-        # than tracking it ourselves -- Manager already updates
-        # device_map[id].online from MQTT bizCode online/offline events.
-        online = {
-            device_id: device.online for device_id, device in manager.device_map.items()
-        }
-        heartbeat(conn, last_values, online, now)
+        try:
+            # Read online state straight from the SDK's own bookkeeping
+            # rather than tracking it ourselves -- Manager already updates
+            # device_map[id].online from MQTT bizCode online/offline events.
+            # CustomerDevice is a SimpleNamespace built from whatever keys
+            # Tuya returned, so `.online` is read defensively: missing
+            # entirely -> not online, and anything that isn't literally
+            # True (a stray string, an int) -> not online too, matching
+            # heartbeat()'s own strict `is True` gate.
+            online = {}
+            for device_id, device in manager.device_map.items():
+                flag = getattr(device, "online", False)
+                online[device_id] = flag is True
+            heartbeat(conn, last_values, online, now)
+        except Exception as e:
+            # A failed heartbeat tick must cost one flat-line minute, not
+            # the whole collector -- record()/record_shadow()/poll_once()/
+            # _PushListener.update_device() all catch-and-log per item for
+            # the same reason. storage.write() can raise on a sqlite busy
+            # timeout (plausible while the nightly VACUUM holds an
+            # exclusive lock), and this is the one call site that wasn't
+            # already guarded.
+            log.error("heartbeat failed: %s", e)
         if last_poll is None or now - last_poll >= interval:
             poll_once(api, conn, poll_ids, scales, seen, last_values)
             last_poll = now
