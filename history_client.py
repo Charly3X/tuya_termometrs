@@ -7,7 +7,6 @@ The fallback is what makes the server optional. With no server configured, or
 with the network down, the widget behaves exactly as it did before.
 """
 import json
-import urllib.error
 import urllib.parse
 import urllib.request
 

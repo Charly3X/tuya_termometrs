@@ -10,7 +10,7 @@ from tuya_local import (
     get_local_all_data,
     log_local_call
 )
-from tuya_history import add_readings, get_device_history
+from tuya_history import add_readings
 import tuya_sharing_api
 import history_client
 from settings import load_settings
