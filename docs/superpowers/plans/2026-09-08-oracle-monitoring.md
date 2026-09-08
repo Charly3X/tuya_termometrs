@@ -848,7 +848,7 @@ if __name__ == "__main__":
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `./venv/bin/python3 -m pytest tests/test_prune.py -v`
-Expected: 6 passed
+Expected: 5 passed
 
 - [ ] **Step 5: Commit**
 
@@ -1926,19 +1926,43 @@ git commit -m "Add one-off import of the legacy history file"
 ### Task 10: Deployment
 
 **Files:**
-- Create: `server/systemd/tuya-collector.service`, `server/systemd/tuya-api.service`, `server/README.md`
+- Create: `pytest.ini`, `server/systemd/tuya-collector.service`, `server/systemd/tuya-api.service`, `server/README.md`
 - Modify: `AGENTS.md`
 
 **Interfaces:**
 - Consumes: everything above.
 - Produces: nothing consumed by other tasks.
 
-- [ ] **Step 1: Run the whole suite**
+- [ ] **Step 1: Stop bare `pytest` from detonating**
+
+`test_region.py` and `test_statistics.py` sit at the repository root. They are
+hand-run diagnostic scripts, not pytest tests, and `test_statistics.py` calls
+`exit(1)` at import time — so a bare `pytest` from the root dies with
+INTERNALERROR before running anything. Every command in this plan passes
+`tests/` explicitly and so dodges it, but the next person will not know that.
+
+Create `pytest.ini`:
+
+```ini
+[pytest]
+testpaths = tests
+```
+
+Verify both invocations now work:
+
+```bash
+./venv/bin/python3 -m pytest -q
+./venv/bin/python3 -m pytest tests/ -q
+```
+
+Expected: both collect the same tests and pass. Neither reports INTERNALERROR.
+
+- [ ] **Step 2: Run the whole suite**
 
 Run: `./venv/bin/python3 -m pytest tests/ -v`
-Expected: all tests pass, 56 total
+Expected: all tests pass, 55 total
 
-- [ ] **Step 2: Write the collector unit**
+- [ ] **Step 3: Write the collector unit**
 
 Create `server/systemd/tuya-collector.service`:
 
@@ -1962,7 +1986,7 @@ StandardError=journal
 WantedBy=multi-user.target
 ```
 
-- [ ] **Step 3: Write the API unit**
+- [ ] **Step 4: Write the API unit**
 
 Create `server/systemd/tuya-api.service`:
 
@@ -1986,7 +2010,7 @@ StandardError=journal
 WantedBy=multi-user.target
 ```
 
-- [ ] **Step 4: Write the deployment guide**
+- [ ] **Step 5: Write the deployment guide**
 
 Create `server/README.md`:
 
@@ -2102,7 +2126,7 @@ Dry run first — this is the default:
 Add `--yes` to actually delete, `--device` or `--metric` to narrow it.
 ````
 
-- [ ] **Step 5: Point AGENTS.md at the server**
+- [ ] **Step 6: Point AGENTS.md at the server**
 
 Append to the "Repository layout" section of `AGENTS.md`:
 
@@ -2117,10 +2141,10 @@ Append to the "Repository layout" section of `AGENTS.md`:
   - `settings.json` is gitignored; `settings.json.example` is the template.
 ```
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add server/systemd server/README.md AGENTS.md
+git add pytest.ini server/systemd server/README.md AGENTS.md
 git commit -m "Add systemd units and server deployment guide"
 ```
 
