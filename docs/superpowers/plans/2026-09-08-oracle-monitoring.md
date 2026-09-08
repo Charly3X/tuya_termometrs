@@ -1113,6 +1113,42 @@ def test_shadow_properties_are_recorded_with_their_own_timestamps(conn):
 def test_shadow_property_without_a_timestamp_is_skipped(conn):
     collector.record_shadow(conn, "dev2", [{"code": "temp_current", "value": 244}], SCALES)
     assert storage.series(conn, "dev2", "temperature", 0) == []
+
+
+def test_push_listener_writes_from_the_mqtt_thread(tmp_path):
+    """
+    The regression guard for the defect that cost this task a fix round.
+
+    paho-mqtt calls update_device on its own thread. A sqlite3 connection
+    created on the main thread cannot be used there, so a listener sharing the
+    collector's connection wrote nothing while looking healthy. Driving the
+    write from a real second thread is the only way to catch that -- calling
+    the listener on the main thread passes against the broken design too.
+    """
+    import threading
+
+    database = tmp_path / "t.db"
+    listener = collector._PushListener(str(database), {"dev1": SCALES})
+
+    class FakeDevice:
+        id = "dev1"
+        name = "socket"
+        status = {"cur_power": 909}
+
+    thread = threading.Thread(
+        target=lambda: listener.update_device(FakeDevice(), ["cur_power"])
+    )
+    thread.start()
+    thread.join()
+
+    # update_device logs and swallows its exceptions, so a raised error would
+    # never reach this thread. The written row is the only honest evidence.
+    conn = storage.connect(database)
+    rows = storage.series(conn, "dev1", "power", 0)
+    conn.close()
+
+    assert len(rows) == 1
+    assert rows[0][1] == 90.9
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -1136,6 +1172,7 @@ in Tuya's catalog cannot be decoded from the push, so they are polled through
 the shadow endpoint instead.
 """
 import logging
+import threading
 import time
 
 import tuya_sharing_api
@@ -1181,9 +1218,34 @@ def record_shadow(conn, device_id, properties, scales):
 
 
 class _PushListener(SharingDeviceListener):
-    def __init__(self, conn, scales):
-        self.conn = conn
+    """
+    Holds its own database connection, opened lazily on whichever thread
+    first uses it.
+
+    paho-mqtt dispatches callbacks on its own thread, and a sqlite3 connection
+    may only be used on the thread that created it. Sharing the collector's
+    main connection here raises ProgrammingError on every push write, which
+    loses all socket power data while shadow-polled sensors keep recording --
+    so the collector looks half-alive instead of broken. Measured before this
+    was fixed: 27 push callbacks arrived, 0 rows were written.
+
+    Two connections against a WAL database is the case WAL exists for.
+    Do not "simplify" this to check_same_thread=False on one shared
+    connection: that removes the guard without removing the hazard, since two
+    threads would then interleave commits.
+    """
+
+    def __init__(self, database, scales):
+        self.database = database
         self.scales = scales
+        self._local = threading.local()
+
+    def _conn(self):
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            conn = storage.connect(self.database)
+            self._local.conn = conn
+        return conn
 
     def update_device(self, device, updated_status_properties=None, dp_timestamps=None):
         if not updated_status_properties:
@@ -1191,7 +1253,7 @@ class _PushListener(SharingDeviceListener):
         status = {c: device.status.get(c) for c in updated_status_properties}
         scales = self.scales.get(device.id, {})
         try:
-            record(self.conn, device.id, status, scales, int(time.time()))
+            record(self._conn(), device.id, status, scales, int(time.time()))
         except Exception as e:
             log.error("failed to record push from %s: %s", device.id, e)
 
@@ -1202,7 +1264,7 @@ class _PushListener(SharingDeviceListener):
         pass
 
 
-def start_push(manager, conn, scales):
+def start_push(manager, database, scales):
     """
     Subscribe to device topics directly.
 
@@ -1211,7 +1273,7 @@ def start_push(manager, conn, scales):
     so it delivers nothing. Measured: 0 events in 90s through refresh_mq,
     27 events in 90s through this path.
     """
-    manager.add_device_listener(_PushListener(conn, scales))
+    manager.add_device_listener(_PushListener(database, scales))
     mq = SharingMQ(
         manager.customer_api,
         [home.id for home in manager.user_homes],
@@ -1257,7 +1319,7 @@ def run(settings_dict, device_ids):
         tuya_sharing_api._TokenListener(session),
     )
     manager.update_device_cache()
-    start_push(manager, conn, scales)
+    start_push(manager, settings_dict["server"]["database"], scales)
 
     interval = settings_dict["server"]["poll_interval"]
     while True:
