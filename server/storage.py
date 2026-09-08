@@ -52,31 +52,6 @@ def series(conn, device, metric, since_ts, until_ts=None):
     return [(row[0], row[1]) for row in conn.execute(sql, args)]
 
 
-def power_series(conn, device, since_ts):
-    """
-    [[ts, power, voltage], ...] — the shape the widget's chart expects.
-
-    Voltage is reported less often than power, so the last known value is
-    carried forward instead of dropping power points that have no voltage
-    at the same timestamp.
-    """
-    rows = conn.execute(
-        "SELECT ts, metric, value FROM readings "
-        "WHERE device = ? AND metric IN ('power', 'voltage') AND ts >= ? "
-        "ORDER BY ts, CASE WHEN metric = 'voltage' THEN 0 ELSE 1 END",
-        (device, since_ts),
-    )
-
-    result = []
-    voltage = 0.0
-    for ts, metric, value in rows:
-        if metric == "voltage":
-            voltage = value
-        else:
-            result.append([ts, value, voltage])
-    return result
-
-
 def _range_clause(start_ts, end_ts, device, metric):
     sql = " WHERE ts >= ? AND ts <= ?"
     args = [start_ts, end_ts]

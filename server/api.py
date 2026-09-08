@@ -118,7 +118,7 @@ def make_handler(conn, token, retention_days=365):
             # A finite "since" can still be too large in magnitude for
             # SQLite's 64-bit signed INTEGER column (storage.py binds it
             # straight into the query), which raises OverflowError deep
-            # in storage.power_series/series. Clamping the lower bound to
+            # in storage.series. Clamping the lower bound to
             # the Unix epoch keeps the "absurdly large hours means return
             # everything" behaviour from before — no real reading has a
             # timestamp earlier than 1970 — without ever handing SQLite a
@@ -127,9 +127,7 @@ def make_handler(conn, token, retention_days=365):
 
             request_conn = sqlite3.connect(db_path, timeout=30)
             try:
-                if url.path == "/history":
-                    self._send(200, storage.power_series(request_conn, device, since))
-                elif url.path == "/series":
+                if url.path == "/series":
                     metric = (query.get("metric") or ["power"])[0]
                     rows = storage.series(request_conn, device, metric, since)
                     self._send(200, [[ts, value] for ts, value in rows])
