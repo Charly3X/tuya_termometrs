@@ -13,14 +13,22 @@ Item {
     // Cursor position for the hover readout, -1 when the mouse is away
     property real cursorX: -1
 
-    // Qt6 QML has no Qt.alpha(color, a) helper. Qt.darker(c, 100) is the
-    // identity transform (factor 100 = "no change") and, unlike plain
-    // property access, it coerces a color-like string into a real color
-    // value so .r/.g/.b are readable regardless of how the series color
-    // was supplied.
-    function _withAlpha(c, a) {
-        var cc = Qt.darker(c, 100)
-        return Qt.rgba(cc.r, cc.g, cc.b, a)
+    // Qt6 QML has no Qt.alpha(color, a) helper, and Qt.darker's factor
+    // semantics are easy to get wrong (factor is *100, so 100 means "no
+    // change" is wrong too — it's actually a heavy darken). To avoid relying
+    // on any Qt color-coercion helper, parse the hex string directly.
+    function _withAlpha(hex, a) {
+        var h = String(hex).replace("#", "")
+        if (h.length === 3) {
+            h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]
+        }
+        if (h.length !== 6) {
+            return Qt.rgba(1, 1, 1, a)   // unknown format: visible, not invisible
+        }
+        return Qt.rgba(parseInt(h.substr(0, 2), 16) / 255,
+                       parseInt(h.substr(2, 2), 16) / 255,
+                       parseInt(h.substr(4, 2), 16) / 255,
+                       a)
     }
 
     function _bounds(list) {
