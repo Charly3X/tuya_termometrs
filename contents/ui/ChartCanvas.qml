@@ -189,7 +189,7 @@ Item {
         visible: chart.cursorX >= 0
         spacing: 8
         y: 2
-        x: Math.min(Math.max(chart.cursorX - width / 2, 4), chart.width - width - 4)
+        x: Math.max(4, Math.min(chart.cursorX - width / 2, chart.width - width - 4))
 
         Repeater {
             model: chart.series
@@ -243,7 +243,7 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         acceptedButtons: Qt.NoButton
-        onPositionChanged: { chart.cursorX = mouse.x; canvas.requestPaint() }
+        onPositionChanged: (mouse) => { chart.cursorX = mouse.x; canvas.requestPaint() }
         onExited: { chart.cursorX = -1; canvas.requestPaint() }
     }
 }
