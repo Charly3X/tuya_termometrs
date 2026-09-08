@@ -288,7 +288,7 @@ PlasmoidItem {
                                     
                                     // Power value
                                     PlasmaComponents.Label {
-                                        text: socketsData[index].power + "W"
+                                        text: socketsData[index].power + " Вт"
                                         font.pixelSize: 24
                                         font.weight: Font.Bold
                                         font.letterSpacing: -0.5
@@ -627,7 +627,12 @@ PlasmoidItem {
                     PlasmaComponents.Label {
                         Layout.alignment: Qt.AlignHCenter
                         visible: chartSource === "local"
-                        text: "локальные данные, сервер недоступен"
+                        // Just the fact, not a reason. This banner cannot tell
+                        // an unreachable server from a live one that simply has
+                        // no rows for this device yet, and claiming the former
+                        // when it is the latter sends someone debugging a
+                        // server that is working fine.
+                        text: "локальные данные"
                         font.pixelSize: 10
                         color: "#fbbf24"
                     }
@@ -690,8 +695,10 @@ PlasmoidItem {
 
                     RowLayout {
                         Layout.fillWidth: true
+                        Layout.topMargin: 8
+                        Layout.bottomMargin: 2
                         visible: root.chartKind === "socket" && root.chartSummary !== null
-                        spacing: 0
+                        spacing: 10
 
                         Repeater {
                             model: root.chartSummary ? [
@@ -701,19 +708,31 @@ PlasmoidItem {
                                 {k: "расход", v: root.chartSummary.kwh.toFixed(2) + " кВт·ч"}
                             ] : []
 
-                            RowLayout {
+                            // Each cell is an Item that fills its share of the row
+                            // with the pair centred inside it. The previous version
+                            // put Layout.fillWidth on the pair's own RowLayout, so
+                            // the two labels packed against the left edge and every
+                            // value ran straight into the next label: "0 Втсред".
+                            Item {
                                 Layout.fillWidth: true
-                                spacing: 4
-                                PlasmaComponents.Label {
-                                    text: modelData.k
-                                    font.pixelSize: 10
-                                    color: Qt.rgba(1, 1, 1, 0.45)
-                                }
-                                PlasmaComponents.Label {
-                                    text: modelData.v
-                                    font.pixelSize: 10
-                                    font.bold: true
-                                    color: "#e8eaf0"
+                                implicitHeight: cell.implicitHeight
+
+                                Row {
+                                    id: cell
+                                    anchors.centerIn: parent
+                                    spacing: 5
+
+                                    PlasmaComponents.Label {
+                                        text: modelData.k
+                                        font.pixelSize: 10
+                                        color: Qt.rgba(1, 1, 1, 0.45)
+                                    }
+                                    PlasmaComponents.Label {
+                                        text: modelData.v
+                                        font.pixelSize: 10
+                                        font.bold: true
+                                        color: "#e8eaf0"
+                                    }
                                 }
                             }
                         }

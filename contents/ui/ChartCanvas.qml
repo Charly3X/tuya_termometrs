@@ -45,11 +45,16 @@ Item {
 
     function _bounds(list) {
         var lo = Infinity, hi = -Infinity
-        var floorZero = list.length > 0
+        var withData = 0, flagged = 0
         for (var s = 0; s < list.length; s++) {
-            if (!list[s].floorAtZero) floorZero = false
             var pts = list[s].points
-            if (!pts) continue
+            // A series with no points contributes no values, so it gets no
+            // vote on the floor either: an empty unflagged series sharing an
+            // axis would otherwise switch the floor off for a flagged one
+            // that does have data.
+            if (!pts || !pts.length) continue
+            withData++
+            if (list[s].floorAtZero) flagged++
             for (var i = 0; i < pts.length; i++) {
                 if (pts[i][1] < lo) lo = pts[i][1]
                 if (pts[i][1] > hi) hi = pts[i][1]
@@ -63,6 +68,7 @@ Item {
         // Only for quantities that declared themselves non-negative, and only
         // when the data itself stays non-negative -- temperature keeps its
         // padding below zero, because -3 °C is a real reading.
+        var floorZero = withData > 0 && flagged === withData
         if (floorZero && lo >= 0 && bottom < 0) bottom = 0
         return [bottom, hi + pad]
     }
