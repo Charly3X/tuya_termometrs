@@ -1,7 +1,17 @@
+import threading
+
 import pytest
 from server import collector, storage
 
 SCALES = {"cur_power": 1, "cur_voltage": 1, "add_ele": 3, "temp_current": 1}
+
+
+class _FakeDevice:
+    """Just enough of tuya_sharing's CustomerDevice for _PushListener."""
+
+    def __init__(self, device_id, status):
+        self.id = device_id
+        self.status = status
 
 
 @pytest.fixture
@@ -49,3 +59,33 @@ def test_shadow_properties_are_recorded_with_their_own_timestamps(conn):
 def test_shadow_property_without_a_timestamp_is_skipped(conn):
     collector.record_shadow(conn, "dev2", [{"code": "temp_current", "value": 244}], SCALES)
     assert storage.series(conn, "dev2", "temperature", 0) == []
+
+
+def test_push_listener_writes_from_the_mqtt_callback_thread(tmp_path):
+    """
+    Reproduces the real bug: paho-mqtt calls update_device() on its own
+    thread, not the thread that built the listener. A _PushListener backed by
+    a single connection created up front would hand that connection to the
+    callback thread and sqlite3 would refuse it (ProgrammingError, silently
+    swallowed by the listener's own try/except), so nothing would be written.
+    The fix is a connection opened lazily per-thread, so this must pass.
+    """
+    db_path = tmp_path / "push.db"
+    listener = collector._PushListener(str(db_path), {"dev1": SCALES})
+    device = _FakeDevice("dev1", {"cur_power": 909})
+
+    # Deliberately never touch the listener from this (the main) thread first --
+    # the very first call must come from a different thread, same as production.
+    worker = threading.Thread(
+        target=listener.update_device,
+        args=(device,),
+        kwargs={"updated_status_properties": ["cur_power"]},
+    )
+    worker.start()
+    worker.join()
+
+    # Read back with a fresh connection from the main thread.
+    conn = storage.connect(db_path)
+    rows = storage.series(conn, "dev1", "power", 0)
+    assert len(rows) == 1
+    assert rows[0][1] == 90.9

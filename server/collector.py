@@ -9,6 +9,7 @@ in Tuya's catalog cannot be decoded from the push, so they are polled through
 the shadow endpoint instead.
 """
 import logging
+import threading
 import time
 
 import tuya_sharing_api
@@ -54,9 +55,33 @@ def record_shadow(conn, device_id, properties, scales):
 
 
 class _PushListener(SharingDeviceListener):
-    def __init__(self, conn, scales):
-        self.conn = conn
+    def __init__(self, database, scales):
+        self.database = database
         self.scales = scales
+        self._local = threading.local()
+
+    def _conn(self):
+        """
+        Open (once) and reuse a connection private to the calling thread.
+
+        paho-mqtt dispatches update_device() on its own network-loop thread,
+        which is not the thread that constructed this listener. A sqlite3
+        connection is bound to the thread that created it -- using one from
+        another thread raises ProgrammingError -- so sharing a single
+        connection between the main thread and the MQTT thread silently loses
+        every push write. check_same_thread=False would silence that error
+        without removing the hazard: two threads would then interleave writes
+        on one connection. The actual fix is a second, separate connection,
+        opened lazily on whichever thread first calls in here and cached on
+        it from then on. Two writers against one database is exactly the case
+        WAL mode -- already enabled by storage.connect() -- exists to support.
+        Do not "simplify" this back to a single shared connection.
+        """
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            conn = storage.connect(self.database)
+            self._local.conn = conn
+        return conn
 
     def update_device(self, device, updated_status_properties=None, dp_timestamps=None):
         if not updated_status_properties:
@@ -64,7 +89,7 @@ class _PushListener(SharingDeviceListener):
         status = {c: device.status.get(c) for c in updated_status_properties}
         scales = self.scales.get(device.id, {})
         try:
-            record(self.conn, device.id, status, scales, int(time.time()))
+            record(self._conn(), device.id, status, scales, int(time.time()))
         except Exception as e:
             log.error("failed to record push from %s: %s", device.id, e)
 
@@ -75,7 +100,7 @@ class _PushListener(SharingDeviceListener):
         pass
 
 
-def start_push(manager, conn, scales):
+def start_push(manager, database, scales):
     """
     Subscribe to device topics directly.
 
@@ -84,7 +109,7 @@ def start_push(manager, conn, scales):
     so it delivers nothing. Measured: 0 events in 90s through refresh_mq,
     27 events in 90s through this path.
     """
-    manager.add_device_listener(_PushListener(conn, scales))
+    manager.add_device_listener(_PushListener(database, scales))
     mq = SharingMQ(
         manager.customer_api,
         [home.id for home in manager.user_homes],
@@ -114,7 +139,8 @@ def run(settings_dict, device_ids):
     if not session:
         raise SystemExit("No Smart Life session. Run tuya_auth.py on this machine.")
 
-    conn = storage.connect(settings_dict["server"]["database"])
+    database = settings_dict["server"]["database"]
+    conn = storage.connect(database)
     api = tuya_sharing_api.get_api()
 
     push_ids, poll_ids, scales = roles.classify(api, device_ids)
@@ -130,7 +156,7 @@ def run(settings_dict, device_ids):
         tuya_sharing_api._TokenListener(session),
     )
     manager.update_device_cache()
-    start_push(manager, conn, scales)
+    start_push(manager, database, scales)
 
     interval = settings_dict["server"]["poll_interval"]
     while True:
