@@ -20,3 +20,4 @@ readings.db-shm
 .superpowers/
 .claude/worktrees/
 settings.json
+venv
