@@ -1772,7 +1772,7 @@ def get_history(settings_dict, token, device_id, hours):
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `./venv/bin/python3 -m pytest tests/test_history_client.py -v`
-Expected: 3 passed
+Expected: 5 passed
 
 - [ ] **Step 5: Wire it into the widget entry point**
 
