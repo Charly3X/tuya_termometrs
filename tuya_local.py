@@ -189,6 +189,11 @@ def parse_socket_status(status):
     # DPS code mapping (varies by device model):
     #
     # Standard mapping:
+    # DPS 17: energy add_ele (0.01 kWh; Tuya declares scale 3, i.e. 0.001 kWh,
+    #         but the hardware disagrees with its own declared spec -- same
+    #         conclusion as tuya_sharing_api.py's add_ele and
+    #         server/units.py's SCALE_OVERRIDES, measured 2026-09-08. Do not
+    #         "correct" this to /1000, it reads 10x low.)
     # DPS 18: current (mA)
     # DPS 19: power (0.1W)
     # DPS 20: voltage (0.1V)
@@ -219,9 +224,13 @@ def parse_socket_status(status):
             if isinstance(value, (int, float)):
                 result["voltage"] = f"{value / 10:.0f}"
         
-        elif key_str in ['101', '17']:  # Energy (0.001 kWh)
+        elif key_str in ['101']:  # Energy (0.001 kWh)
             if isinstance(value, (int, float)):
                 result["energy"] = f"{value / 1000:.2f}"
+
+        elif key_str in ['17']:  # Energy add_ele, standard mapping (0.01 kWh -- see header comment)
+            if isinstance(value, (int, float)):
+                result["energy"] = f"{value / 100:.2f}"
     
     return result
 
