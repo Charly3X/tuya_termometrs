@@ -289,8 +289,13 @@ def get_socket_data():
             elif item["code"] == "cur_voltage":
                 socket_data["voltage"] = f"{item['value'] / 10:.0f}"
             elif item["code"] == "add_ele":
-                socket_data["energy"] = f"{item['value'] / 1000:.2f}"
-    
+                # Tuya declares scale 3 for add_ele, but this hardware reports
+                # 0.01 kWh units, so the declared scale is deliberately not
+                # used. Measured 2026-09-08 against the plug itself; see
+                # server/units.py SCALE_OVERRIDES. Do not "correct" this to
+                # /1000 -- that reads 10x low.
+                socket_data["energy"] = f"{item['value'] / 100:.2f}"
+
     return {"socket": socket_data}
 
 def get_all_data():
@@ -403,7 +408,10 @@ def get_all_data():
                 elif item["code"] == "cur_voltage":
                     socket_data["voltage"] = f"{item['value'] / 10:.0f}"
                 elif item["code"] == "add_ele":
-                    socket_data["energy"] = f"{item['value'] / 1000:.2f}"
+                    # Tuya declares scale 3, but this hardware reports 0.01 kWh
+                    # units, so the declared scale is deliberately not used.
+                    # See server/units.py SCALE_OVERRIDES. /1000 reads 10x low.
+                    socket_data["energy"] = f"{item['value'] / 100:.2f}"
         except Exception as e:
             pass
     
