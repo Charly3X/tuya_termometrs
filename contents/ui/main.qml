@@ -20,6 +20,17 @@ PlasmoidItem {
     // merged into socketsData because it comes from its own slow (300s)
     // timer, separate from the 7-second socket poll.
     property var socketEnergy: ({})
+
+    // The energy timer's triggeredOnStart fires while socketsData is still
+    // empty, so its first attempt is skipped and the card would show no
+    // consumption for a full 300s after every restart. Ask again the moment
+    // the sockets actually arrive, but only while we still have nothing --
+    // otherwise every 7-second socket poll would drag a day's integral with it.
+    onSocketsDataChanged: {
+        if (socketsData.length > 0 && Object.keys(socketEnergy).length === 0) {
+            updateEnergy()
+        }
+    }
     property string thermometerUpdate: ""
     property string socketUpdate: ""
     
