@@ -70,6 +70,20 @@ def test_retention_run_does_not_vacuum(conn, monkeypatch):
     assert storage.series(conn, "dev1", "power", 0) == []
 
 
+def test_vacuum_flag_forces_a_vacuum_on_the_retention_path(conn, monkeypatch):
+    # The obvious response to a full disk is to lower retention_days, but a
+    # retention delete alone never shrinks the file -- freed pages go to
+    # SQLite's freelist, not back to the filesystem. --vacuum is the opt-in
+    # escape hatch for that case.
+    calls = []
+    monkeypatch.setattr(prune.storage, "vacuum", lambda c: calls.append(c))
+    now = int(time.time())
+    storage.write(conn, now - 400 * 86400, "dev1", {"power": 1.0})
+    prune.main(["--database", db_path(conn), "--older-than-days", "365",
+                "--yes", "--vacuum"])
+    assert len(calls) == 1
+
+
 def test_deleting_a_period_by_hand_still_vacuums(conn, monkeypatch):
     calls = []
     monkeypatch.setattr(prune.storage, "vacuum", lambda c: calls.append(c))

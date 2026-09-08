@@ -134,6 +134,17 @@ state it deletes about as much as the collector inserts, so there is nothing
 to reclaim, and vacuuming a multi-gigabyte database holds an exclusive lock
 long enough for the collector's writes to time out and be lost.
 
+**Lowering `retention_days` frees rows, not disk.** The most likely reason to
+lower it is a full disk, but SQLite does not shrink the file on `DELETE` --
+freed pages go to its freelist for reuse, not back to the filesystem. If you
+actually need the space back, add `--vacuum` to force one regardless of
+selection mode (same exclusive-lock cost as above, so pick a quiet moment):
+
+```bash
+sudo -u tuya /opt/tuya/venv/bin/python3 -m server.prune \
+  --database /opt/tuya/readings.db --yes --vacuum
+```
+
 ## Deleting a period by hand
 
 Dry run first — this is the default:

@@ -7,15 +7,23 @@ same storage.delete_range(), so they cannot drift apart.
     prune.py --database DB --from 2026-09-01 --to 2026-09-03 [--device ID] [--metric power]
     prune.py --database DB --yes                       # retention from settings.json
     prune.py --database DB --older-than-days 365 --yes # retention, overridden
+    prune.py --database DB --older-than-days 90 --yes --vacuum # retention, reclaim disk too
 
 Without --yes nothing is deleted; the tool only reports what would go.
 
-Only the by-hand range vacuums afterwards. That is the "this data is garbage,
-give me the disk back" case. The retention run deliberately does not: in
-steady state deletions balance insertions so there is nothing to reclaim,
-and a VACUUM of a multi-gigabyte database rewrites the whole file under an
-exclusive lock, during which the collector's writes hit the busy timeout and
-are lost.
+Only the by-hand range vacuums afterwards by default. That is the "this data
+is garbage, give me the disk back" case. The retention run deliberately does
+not: in steady state deletions balance insertions so there is nothing to
+reclaim, and a VACUUM of a multi-gigabyte database rewrites the whole file
+under an exclusive lock, during which the collector's writes hit the busy
+timeout and are lost.
+
+`--vacuum` overrides that default and forces a vacuum regardless of which
+selection mode was used. This exists because lowering `retention_days` is
+the obvious response to a full disk, but a retention delete alone never
+shrinks the file -- the freed pages go to SQLite's freelist for reuse, not
+back to the filesystem. Use it deliberately (ideally at a quiet moment): it
+carries the same exclusive-lock cost described above.
 """
 import argparse
 import sys
@@ -56,6 +64,12 @@ def main(argv=None, settings_dict=None):
     parser.add_argument("--device")
     parser.add_argument("--metric")
     parser.add_argument("--yes", action="store_true", help="actually delete")
+    parser.add_argument(
+        "--vacuum",
+        action="store_true",
+        help="force a VACUUM afterwards, even on the retention path "
+        "(default: only --from/--to vacuums)",
+    )
     args = parser.parse_args(argv)
 
     by_hand = bool(args.from_day or args.to_day)
@@ -92,7 +106,7 @@ def main(argv=None, settings_dict=None):
             return 0
 
         deleted = storage.delete_range(conn, start, end, args.device, args.metric)
-        if by_hand:
+        if by_hand or args.vacuum:
             storage.vacuum(conn)
             print(f"\nDeleted {deleted} rows and vacuumed.")
         else:
