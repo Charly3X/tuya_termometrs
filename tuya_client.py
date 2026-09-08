@@ -13,6 +13,7 @@ from tuya_local import (
 from tuya_history import add_readings
 import tuya_sharing_api
 import history_client
+import chart_data
 from settings import load_settings
 
 CONFIG_FILE = Path(__file__).parent / "config.json"
@@ -425,19 +426,25 @@ if __name__ == "__main__":
     mode = args[0] if len(args) > 0 else "all"
     connection_mode = args[1] if len(args) > 1 else "cloud"
     
-    # History mode: output chart data and exit
-    if mode == "history":
+    # Chart mode: output one or more metric series and exit
+    if mode == "series":
         device_id = args[1] if len(args) > 1 else ""
         hours = int(args[2]) if len(args) > 2 else 1
+        metrics = (args[3] if len(args) > 3 else "power").split(",")
         app_settings = load_settings()
         token = (load_config() or {}).get("history_token", "")
-        history, source = history_client.get_history(
-            app_settings, token, device_id, hours
+        # The summary comes back from get_series rather than being computed
+        # here, because it has to be taken from the raw rows: the series in
+        # hand is already downsampled, and averaging min/max pairs would
+        # overstate consumption several-fold.
+        series, source, summary = history_client.get_series(
+            app_settings, token, device_id, hours, metrics
         )
         print(json.dumps({
-            "history": history,
-            "history_device": device_id,
-            "history_source": source,
+            "series": series,
+            "device": device_id,
+            "source": source,
+            "summary": summary,
         }))
         sys.exit(0)
     
