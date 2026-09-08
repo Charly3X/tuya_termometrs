@@ -616,10 +616,19 @@ def power_series(conn, device, since_ts):
     carried forward instead of dropping power points that have no voltage
     at the same timestamp.
     """
+    # The CASE is not decoration. write() stores one row per metric, so a
+    # report carrying both power and voltage produces two rows with the SAME
+    # ts. Under a plain "ORDER BY ts" SQLite probes the index once per value of
+    # the IN list -- 'power' first -- and the stable sort then leaves the power
+    # row ahead of the voltage row it should have been paired with, so that
+    # reading carries a stale voltage. Verified: the plain version fails
+    # test_power_series_carries_the_last_voltage_forward, returning
+    # [100, 10.0, 0.0] instead of [100, 10.0, 230.0]. The explicit tie-break
+    # fixes it deterministically rather than relying on rowid order.
     rows = conn.execute(
         "SELECT ts, metric, value FROM readings "
         "WHERE device = ? AND metric IN ('power', 'voltage') AND ts >= ? "
-        "ORDER BY ts",
+        "ORDER BY ts, CASE WHEN metric = 'voltage' THEN 0 ELSE 1 END",
         (device, since_ts),
     )
 
