@@ -151,11 +151,36 @@ def test_heartbeat_skips_a_device_absent_from_online(conn):
 
 
 def test_heartbeat_never_writes_a_non_heartbeat_metric(conn):
-    last_values = {("dev1", "temperature"): [100, 21.0]}
+    """
+    Battery is the case this guards. It is not charted and it moves over days,
+    so a row a minute would be landfill.
+    """
+    last_values = {("dev1", "battery"): [100, 80.0]}
     online = {"dev1": True}
     written = collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_SECONDS)
     assert written == 0
-    assert storage.series(conn, "dev1", "temperature", 0) == []
+    assert storage.series(conn, "dev1", "battery", 0) == []
+
+
+def test_heartbeat_covers_the_sensor_metrics_too(conn):
+    """
+    The thermometers only report past a threshold of about half a degree, so
+    over a real day they produced four or five readings each: an hour-long
+    chart was empty and a day-long one was a four-segment zigzag.
+    """
+    last_values = {
+        ("dev2", "temperature"): [100, 21.4],
+        ("dev2", "humidity"): [100, 52.0],
+    }
+    online = {"dev2": True}
+    written = collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_SECONDS)
+    assert written == 2
+    assert storage.series(conn, "dev2", "temperature", 0) == [
+        (100 + collector.HEARTBEAT_SECONDS, 21.4)
+    ]
+    assert storage.series(conn, "dev2", "humidity", 0) == [
+        (100 + collector.HEARTBEAT_SECONDS, 52.0)
+    ]
 
 
 def test_second_heartbeat_immediately_after_the_first_writes_nothing(conn):

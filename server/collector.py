@@ -21,12 +21,20 @@ from tuya_sharing.mq import SharingMQ
 log = logging.getLogger("collector")
 
 # How often a heartbeat "still the same" row is written for a metric that has
-# gone quiet, and which metrics are worth it. Power is the one that sits at a
-# constant, meaningful 0 for long stretches (compressor off, device idle) --
-# other metrics either change often enough to keep arriving on their own, or
-# their absence is not informative in the same way.
+# gone quiet, and which metrics get one.
+#
+# Every charted quantity needs this, because every one of them can sit
+# unchanged for a long time and Tuya only sends changes. Power holds a
+# constant 0 whenever a compressor stops or nothing is plugged in. The
+# thermometers are worse: they only report past a threshold of roughly half a
+# degree, so measured over a real day they produced four or five readings each
+# -- an hour-long chart was simply empty and a day-long one was a four-segment
+# zigzag.
+#
+# Battery is left out on purpose: it is not charted, and it moves so slowly
+# that a row a minute would be pure landfill.
 HEARTBEAT_SECONDS = 60
-HEARTBEAT_METRICS = ("power",)
+HEARTBEAT_METRICS = ("power", "temperature", "humidity")
 
 # Guards every read-modify-write of a `last_values` map shared between the
 # MQTT callback thread (_PushListener, via record()) and the main thread
