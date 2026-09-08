@@ -6,8 +6,8 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=tuya
-WorkingDirectory=/opt/tuya
-ExecStart=/opt/tuya/venv/bin/python3 -m server.api
+WorkingDirectory=/opt/tuya/repo
+ExecStart=/opt/tuya/repo/venv/bin/python3 -m server.api
 Restart=always
 RestartSec=10
 StandardOutput=journal

@@ -13,8 +13,10 @@ show both.
 
 ```bash
 sudo useradd -r -m -d /opt/tuya tuya
-sudo -u tuya git clone <repo-url> /opt/tuya
-cd /opt/tuya
+# Clone into a subdirectory: useradd -m has already populated /opt/tuya
+# with skeleton files, and git refuses to clone into a non-empty directory.
+sudo -u tuya git clone <repo-url> /opt/tuya/repo
+cd /opt/tuya/repo
 sudo -u tuya python3 -m venv venv
 sudo -u tuya ./venv/bin/pip install -r requirements.txt
 ```
@@ -27,7 +29,7 @@ sudo -u tuya cp config.json.example config.json
 ```
 
 `settings.json` needs no edits on the server: `server.database` already points
-at `/opt/tuya/readings.db`, and `history_server` is deliberately empty — that
+at `/opt/tuya/repo/readings.db`, and `history_server` is deliberately empty — that
 one is for the desktop, which fills in `http://SERVER_IP:8080` so the widget
 pulls its chart from here. Leaving it set on the server, or on a desktop with
 no collector, only buys a `history_timeout` wait before the local fallback.
@@ -125,7 +127,7 @@ sudo -u tuya crontab -e
 ```
 
 ```
-17 4 * * * cd /opt/tuya && /opt/tuya/venv/bin/python3 -m server.prune --database /opt/tuya/readings.db --yes
+17 4 * * * cd /opt/tuya/repo && /opt/tuya/repo/venv/bin/python3 -m server.prune --database /opt/tuya/repo/readings.db --yes
 ```
 
 The age comes from `server.retention_days` in `settings.json`, so change it
@@ -141,8 +143,8 @@ actually need the space back, add `--vacuum` to force one regardless of
 selection mode (same exclusive-lock cost as above, so pick a quiet moment):
 
 ```bash
-sudo -u tuya /opt/tuya/venv/bin/python3 -m server.prune \
-  --database /opt/tuya/readings.db --yes --vacuum
+sudo -u tuya /opt/tuya/repo/venv/bin/python3 -m server.prune \
+  --database /opt/tuya/repo/readings.db --yes --vacuum
 ```
 
 ## Deleting a period by hand
@@ -150,8 +152,8 @@ sudo -u tuya /opt/tuya/venv/bin/python3 -m server.prune \
 Dry run first — this is the default:
 
 ```bash
-sudo -u tuya /opt/tuya/venv/bin/python3 -m server.prune \
-  --database /opt/tuya/readings.db --from 2026-09-01 --to 2026-09-03
+sudo -u tuya /opt/tuya/repo/venv/bin/python3 -m server.prune \
+  --database /opt/tuya/repo/readings.db --from 2026-09-01 --to 2026-09-03
 ```
 
 Add `--yes` to actually delete, `--device` or `--metric` to narrow it. Unlike
