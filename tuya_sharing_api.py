@@ -74,13 +74,6 @@ def save_session(session):
     SESSION_FILE.chmod(0o600)
 
 
-def is_available(config):
-    """True when the sharing backend is configured and authenticated."""
-    if config.get("cloud_backend", "sharing") != "sharing":
-        return False
-    return load_session() is not None
-
-
 class _TokenListener(SharingTokenListener):
     """Persists rotated tokens so the next widget refresh reuses them."""
 

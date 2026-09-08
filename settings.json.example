@@ -1,0 +1,14 @@
+{
+    "region": "eu",
+    "cloud_backend": "sharing",
+
+    "history_server": "http://SERVER_IP:8080",
+    "history_timeout": 3,
+
+    "server": {
+        "database": "/var/lib/tuya/readings.db",
+        "port": 8080,
+        "retention_days": 365,
+        "poll_interval": 300
+    }
+}

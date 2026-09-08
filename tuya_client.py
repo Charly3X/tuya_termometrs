@@ -12,6 +12,7 @@ from tuya_local import (
 )
 from tuya_history import add_readings, get_device_history
 import tuya_sharing_api
+from settings import load_settings
 
 CONFIG_FILE = Path(__file__).parent / "config.json"
 OUTPUT_FILE = Path(__file__).parent / "data.json"
@@ -160,13 +161,14 @@ def use_sharing_backend(config):
     Whether to read the cloud through the Smart Life sharing SDK.
 
     Preferred over tinytuya.Cloud because it does not need an IoT Core
-    subscription. Set "cloud_backend": "iot_core" in config.json to force the
-    old path.
+    subscription. Set "cloud_backend": "iot_core" in settings.json to force
+    the old path.
     """
     if not config:
         return False
     try:
-        return tuya_sharing_api.is_available(config)
+        backend = load_settings().get("cloud_backend", "sharing")
+        return backend == "sharing" and tuya_sharing_api.load_session() is not None
     except Exception:
         return False
 
