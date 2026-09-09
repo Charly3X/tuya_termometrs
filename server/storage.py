@@ -52,6 +52,35 @@ def series(conn, device, metric, since_ts, until_ts=None):
     return [(row[0], row[1]) for row in conn.execute(sql, args)]
 
 
+def series_bucketed(conn, device, metric, since_ts, bucket_seconds, until_ts=None):
+    """
+    [[bucket_start_ts, average_value], ...] ordered by time, one entry per
+    bucket that has rows.
+
+    Grouping happens in SQL via integer division of ts by bucket_seconds --
+    SQLite's "/" truncates for two integer operands, which is exactly the
+    bucket index. Each entry is labelled with the bucket's start
+    (bucket_index * bucket_seconds), not the timestamp of whichever row
+    happened to land in it first: labelling by first-row-ts would make the
+    x position of a bucket drift with which sample arrived first, instead of
+    sitting on a fixed hourly (or whatever bucket_seconds is) grid. A bucket
+    with no rows is simply absent from the result -- GROUP BY never
+    manufactures a row for a group that does not exist, so there is no zero
+    to filter out.
+    """
+    bucket_seconds = int(bucket_seconds)
+    sql = (
+        "SELECT (ts / ?) * ? AS bucket_start, AVG(value) FROM readings "
+        "WHERE device = ? AND metric = ? AND ts >= ?"
+    )
+    args = [bucket_seconds, bucket_seconds, device, metric, since_ts]
+    if until_ts is not None:
+        sql += " AND ts <= ?"
+        args.append(until_ts)
+    sql += " GROUP BY bucket_start ORDER BY bucket_start"
+    return [[row[0], row[1]] for row in conn.execute(sql, args)]
+
+
 def _range_clause(start_ts, end_ts, device, metric):
     sql = " WHERE ts >= ? AND ts <= ?"
     args = [start_ts, end_ts]
