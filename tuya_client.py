@@ -15,6 +15,39 @@ import tuya_sharing_api
 import history_client
 from settings import load_settings
 
+def _parse_series_args(args):
+    """
+    (device_id, hours, metrics, bucket) from the "series" CLI mode's
+    positional arguments.
+
+    args is sys.argv[1:] with "--log" filtered out, args[0] == "series".
+    This argument vector arrives through shell word splitting (main.qml
+    builds the command by string concatenation), so an empty positional does
+    not stay empty -- it disappears and every later positional shifts left.
+    Every field is therefore validated rather than trusted, the same way
+    hours already was before bucket existed: a non-numeric hours or bucket
+    falls back to a safe default (0) instead of raising, so a shifted
+    argument vector degrades to "no request" or "no bucketing" rather than
+    crashing the CLI call the widget is waiting on.
+    """
+    device_id = args[1] if len(args) > 1 else ""
+    try:
+        hours = int(args[2]) if len(args) > 2 else 1
+    except ValueError:
+        hours = 0
+    metrics = (args[3] if len(args) > 3 else "power").split(",")
+    # Fourth positional: bucket width in seconds, defaulting to 0 (no
+    # bucketing) so every caller that only ever passed three arguments keeps
+    # working unchanged.
+    try:
+        bucket = int(args[4]) if len(args) > 4 else 0
+    except ValueError:
+        bucket = 0
+    if bucket < 0:
+        bucket = 0
+    return device_id, hours, metrics, bucket
+
+
 CONFIG_FILE = Path(__file__).parent / "config.json"
 OUTPUT_FILE = Path(__file__).parent / "data.json"
 CACHE_FILE = Path(__file__).parent / "device_names_cache.json"
@@ -439,15 +472,7 @@ if __name__ == "__main__":
     
     # Chart mode: output one or more metric series and exit
     if mode == "series":
-        # This argument vector arrives through shell word splitting (main.qml
-        # builds the command by string concatenation), so an empty device id
-        # does not stay empty -- it disappears and every later positional
-        # shifts left. Validate rather than trust args[1]/args[2].
-        device_id = args[1] if len(args) > 1 else ""
-        try:
-            hours = int(args[2]) if len(args) > 2 else 1
-        except ValueError:
-            hours = 0
+        device_id, hours, metrics, bucket = _parse_series_args(args)
         if not device_id or hours <= 0:
             # No request was made, so the server's health is unknown: "empty"
             # makes the widget say "нет данных" instead of blaming a machine
@@ -455,15 +480,14 @@ if __name__ == "__main__":
             print(json.dumps({"series": {}, "device": device_id,
                               "source": "empty", "summaries": {}}))
             sys.exit(0)
-        metrics = (args[3] if len(args) > 3 else "power").split(",")
         app_settings = load_settings()
         token = (load_config() or {}).get("history_token", "")
         # The summaries come back from get_series rather than being computed
         # here, because they have to be taken from the raw rows: the series
-        # in hand is already downsampled, and averaging min/max pairs would
-        # overstate consumption several-fold.
+        # in hand may be downsampled or bucketed, and averaging min/max pairs
+        # (or averaging averages) would overstate or understate consumption.
         series, source, summaries = history_client.get_series(
-            app_settings, token, device_id, hours, metrics
+            app_settings, token, device_id, hours, metrics, bucket=bucket
         )
         print(json.dumps({
             "series": series,
