@@ -69,6 +69,14 @@ def series_bucketed(conn, device, metric, since_ts, bucket_seconds, until_ts=Non
     to filter out.
     """
     bucket_seconds = int(bucket_seconds)
+    if bucket_seconds <= 0:
+        # SQLite returns NULL for division by zero rather than raising, so a
+        # bucket of 0 would collapse every row into one entry labelled with a
+        # NULL timestamp -- which serialises to null, reaches the chart as NaN
+        # and draws nothing, with no error anywhere to explain it. The caller
+        # in api.py already routes 0 to the unbucketed query; this refuses the
+        # value outright so the next caller cannot get the silent version.
+        raise ValueError("bucket_seconds must be positive")
     sql = (
         "SELECT (ts / ?) * ? AS bucket_start, AVG(value) FROM readings "
         "WHERE device = ? AND metric = ? AND ts >= ?"

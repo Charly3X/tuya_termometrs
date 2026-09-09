@@ -105,3 +105,17 @@ def test_connect_is_idempotent(tmp_path):
     c2 = storage.connect(path)  # must not wipe or fail on existing schema
     assert storage.series(c2, "dev1", "power", 0) == [(100, 1.0)]
     c2.close()
+
+
+def test_bucketing_refuses_a_non_positive_width(conn):
+    """
+    SQLite returns NULL for division by zero instead of raising, so a bucket
+    of 0 silently collapsed every row into one entry with a NULL timestamp:
+    null over the wire, NaN in the chart, nothing drawn and no error to
+    explain it. Refuse the value where it is used, not only where it is
+    currently guarded.
+    """
+    storage.write(conn, 100, "dev1", {"temperature": 20.0})
+    for bad in (0, -1):
+        with pytest.raises(ValueError):
+            storage.series_bucketed(conn, "dev1", "temperature", 0, bad)
