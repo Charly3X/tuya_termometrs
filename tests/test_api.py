@@ -251,6 +251,60 @@ def test_summary_for_unknown_device_reports_zero_points(base_url):
     assert result["kwh"] == 0.0
 
 
+def test_bucket_reduces_the_number_of_points(tmp_path):
+    conn = storage.connect(tmp_path / "bucket.db")
+    now = int(time.time())
+    # 180 one-minute-apart readings spanning 3 hours: unbucketed that is 180
+    # points; bucketed to the hour it collapses to at most 3.
+    for i in range(180):
+        storage.write(conn, now - i * 60, "dev1", {"temperature": 20.0 + (i % 5)})
+
+    server = ThreadingHTTPServer(
+        ("127.0.0.1", 0), api.make_handler(conn, TOKEN, retention_days=FIXTURE_RETENTION_DAYS)
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base = f"http://127.0.0.1:{server.server_port}"
+        raw = fetch(f"{base}/series?device=dev1&metric=temperature&hours=999999999")
+        bucketed = fetch(f"{base}/series?device=dev1&metric=temperature&hours=999999999&bucket=3600")
+        assert len(raw) == 180
+        assert len(bucketed) < len(raw)
+    finally:
+        server.shutdown()
+        conn.close()
+
+
+def test_bucket_zero_behaves_like_no_bucket(base_url):
+    without = fetch(f"{base_url}/series?device=dev1&metric=power&hours=999999999")
+    with_zero = fetch(f"{base_url}/series?device=dev1&metric=power&hours=999999999&bucket=0")
+    assert with_zero == without
+
+
+def test_bucket_absent_behaves_like_before(base_url):
+    result = fetch(f"{base_url}/series?device=dev1&metric=power&hours=999999999")
+    assert result == [[1000, 90.9], [1010, 80.0]]
+
+
+def test_non_numeric_bucket_is_400(base_url):
+    with pytest.raises(urllib.error.HTTPError) as excinfo:
+        fetch(f"{base_url}/series?device=dev1&metric=power&hours=24&bucket=abc")
+    assert excinfo.value.code == 400
+
+
+def test_negative_bucket_is_400(base_url):
+    with pytest.raises(urllib.error.HTTPError) as excinfo:
+        fetch(f"{base_url}/series?device=dev1&metric=power&hours=24&bucket=-1")
+    assert excinfo.value.code == 400
+
+
+@pytest.mark.parametrize("value", ["nan", "inf", "-inf"])
+def test_non_finite_bucket_is_400(base_url, value):
+    with pytest.raises(urllib.error.HTTPError) as excinfo:
+        fetch(f"{base_url}/series?device=dev1&metric=power&hours=24&bucket={value}")
+    assert excinfo.value.code == 400
+
+
 def test_absent_hours_defaults_to_24_and_returns_data(tmp_path):
     conn = storage.connect(tmp_path / "recent.db")
     now = int(time.time())

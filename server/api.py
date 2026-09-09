@@ -130,7 +130,38 @@ def make_handler(conn, token, retention_days=365):
             try:
                 if url.path == "/series":
                     metric = (query.get("metric") or ["power"])[0]
-                    rows = storage.series(request_conn, device, metric, since)
+
+                    # Same shape of hazard as "hours": untrusted network
+                    # input that must not be allowed to raise inside this
+                    # handler. Parsed the same way -- float(), then an
+                    # explicit isfinite() check before any comparison,
+                    # because nan and +inf both survive a bare "< 0". Unlike
+                    # hours, 0 is a legal value here rather than a 400: it is
+                    # the documented "no bucketing, raw rows" default, so
+                    # only negative and non-finite values are rejected.
+                    raw_bucket = (query.get("bucket") or ["0"])[0]
+                    try:
+                        bucket = float(raw_bucket)
+                        if not math.isfinite(bucket) or bucket < 0:
+                            raise ValueError("bucket must be a non-negative number")
+                    except ValueError:
+                        self._send(400, {"error": "bucket must be a non-negative number"})
+                        return
+
+                    # A bucket width has no business being wider than a
+                    # human lifetime, and capping it here avoids handing
+                    # SQLite's "ts / ?" a value so large that int() or the
+                    # division overflows its 64-bit INTEGER column -- the
+                    # same class of crash the "since" clamp exists to avoid,
+                    # just for the other operand of the same query.
+                    bucket_seconds = int(min(bucket, 10**9))
+
+                    if bucket_seconds:
+                        rows = storage.series_bucketed(
+                            request_conn, device, metric, since, bucket_seconds
+                        )
+                    else:
+                        rows = storage.series(request_conn, device, metric, since)
                     self._send(200, [[ts, value] for ts, value in rows])
                 elif url.path == "/summary":
                     # Statistics must come from the raw rows, never from an
