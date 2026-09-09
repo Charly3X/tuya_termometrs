@@ -41,6 +41,14 @@ PlasmoidItem {
     property var chartSeries: []
     property var chartSummaries: ({})
     property int chartPeriod: 1
+    // Bucket width in seconds for /series, forwarded straight to
+    // tuya_client.py's fourth "series" argument. 0 means unbucketed (the
+    // socket chart's raw, unchanged behaviour); 3600 groups the sensor
+    // chart's mostly-repeated readings into one point per hour. Set only by
+    // the card click alongside chartKind -- the in-window period buttons
+    // change chartPeriod but never the kind, so the bucket stays put across
+    // them.
+    property int chartBucket: 0
     property bool chartVisible: false
     property string chartSource: "server"
     // The window the chart's time axis spans, in epoch seconds. Derived from
@@ -234,7 +242,7 @@ PlasmoidItem {
         var metrics = chartKind === "socket" ? "power" : "temperature,humidity"
         var cmd = "/home/charoyan/projects/tuya/venv/bin/python3 "
                 + "/home/charoyan/projects/tuya/tuya_client.py series "
-                + chartDeviceId + " " + chartPeriod + " " + metrics
+                + chartDeviceId + " " + chartPeriod + " " + metrics + " " + chartBucket
         cmd += " #" + Date.now()
         executable.connectSource(cmd)
     }
@@ -402,6 +410,7 @@ PlasmoidItem {
                                         // A plug reports every few seconds,
                                         // so an hour is already a full curve.
                                         root.chartPeriod = 1
+                                        root.chartBucket = 0
                                         root.chartSeries = []
                                         root.chartSummaries = {}
                                         root.chartSource = "server"
@@ -581,6 +590,13 @@ PlasmoidItem {
                                     // and opens on a lone dot. 24 hours is
                                     // the shortest period that shows a curve.
                                     root.chartPeriod = 24
+                                    // A sensor writes a "still the same" row
+                                    // every minute so gaps stay meaningful,
+                                    // which leaves a day's worth of raw rows
+                                    // carrying only a handful of distinct
+                                    // values -- one point per hour is enough
+                                    // to draw the same curve.
+                                    root.chartBucket = 3600
                                     root.chartSeries = []
                                     root.chartSummaries = {}
                                     root.chartSource = "server"

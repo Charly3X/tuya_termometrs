@@ -171,7 +171,15 @@ Window {
             spacing: 4
 
             Repeater {
-                model: [{label: "1ч", hours: 1}, {label: "6ч", hours: 6}, {label: "24ч", hours: 24}]
+                // A plug reports every few seconds, so 1ч/6ч/24ч give a
+                // socket a full curve at every step. A sensor only writes a
+                // changed value (bucketed to one point per hour by the
+                // caller), so the same short periods would show the same
+                // handful of points three times over -- 24ч/7д/30д actually
+                // move the window.
+                model: chartWindow.kind === "socket"
+                       ? [{label: "1ч", hours: 1}, {label: "6ч", hours: 6}, {label: "24ч", hours: 24}]
+                       : [{label: "24ч", hours: 24}, {label: "7д", hours: 168}, {label: "30д", hours: 720}]
 
                 Rectangle {
                     width: 50
