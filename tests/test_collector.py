@@ -119,17 +119,17 @@ def test_shadow_dedup_is_tracked_per_device_and_metric(conn):
 def test_heartbeat_writes_a_row_for_a_stale_metric_of_an_online_device(conn):
     last_values = {("dev1", "power"): [100, 42.0]}
     online = {"dev1": True}
-    written = collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_SECONDS)
+    written = collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_INTERVALS["power"])
     assert written == 1
     assert storage.series(conn, "dev1", "power", 0) == [
-        (100 + collector.HEARTBEAT_SECONDS, 42.0)
+        (100 + collector.HEARTBEAT_INTERVALS["power"], 42.0)
     ]
 
 
 def test_heartbeat_leaves_a_recently_written_metric_alone(conn):
     last_values = {("dev1", "power"): [100, 42.0]}
     online = {"dev1": True}
-    written = collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_SECONDS - 1)
+    written = collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_INTERVALS["power"] - 1)
     assert written == 0
     assert storage.series(conn, "dev1", "power", 0) == []
 
@@ -137,7 +137,7 @@ def test_heartbeat_leaves_a_recently_written_metric_alone(conn):
 def test_heartbeat_skips_an_offline_device(conn):
     last_values = {("dev1", "power"): [100, 42.0]}
     online = {"dev1": False}
-    written = collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_SECONDS)
+    written = collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_INTERVALS["power"])
     assert written == 0
     assert storage.series(conn, "dev1", "power", 0) == []
 
@@ -145,7 +145,7 @@ def test_heartbeat_skips_an_offline_device(conn):
 def test_heartbeat_skips_a_device_absent_from_online(conn):
     last_values = {("dev1", "power"): [100, 42.0]}
     online = {}
-    written = collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_SECONDS)
+    written = collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_INTERVALS["power"])
     assert written == 0
     assert storage.series(conn, "dev1", "power", 0) == []
 
@@ -157,7 +157,7 @@ def test_heartbeat_never_writes_a_non_heartbeat_metric(conn):
     """
     last_values = {("dev1", "battery"): [100, 80.0]}
     online = {"dev1": True}
-    written = collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_SECONDS)
+    written = collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_INTERVALS["power"])
     assert written == 0
     assert storage.series(conn, "dev1", "battery", 0) == []
 
@@ -168,25 +168,47 @@ def test_heartbeat_covers_the_sensor_metrics_too(conn):
     over a real day they produced four or five readings each: an hour-long
     chart was empty and a day-long one was a four-segment zigzag.
     """
+    interval = collector.HEARTBEAT_INTERVALS["temperature"]
     last_values = {
         ("dev2", "temperature"): [100, 21.4],
         ("dev2", "humidity"): [100, 52.0],
     }
     online = {"dev2": True}
-    written = collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_SECONDS)
+    written = collector.heartbeat(conn, last_values, online, 100 + interval)
     assert written == 2
-    assert storage.series(conn, "dev2", "temperature", 0) == [
-        (100 + collector.HEARTBEAT_SECONDS, 21.4)
-    ]
-    assert storage.series(conn, "dev2", "humidity", 0) == [
-        (100 + collector.HEARTBEAT_SECONDS, 52.0)
-    ]
+    assert storage.series(conn, "dev2", "temperature", 0) == [(100 + interval, 21.4)]
+    assert storage.series(conn, "dev2", "humidity", 0) == [(100 + interval, 52.0)]
+
+
+def test_sensor_metrics_wait_longer_than_power(conn):
+    """
+    The whole point of the per-metric intervals. The sensor chart averages
+    into hourly points, so sixty identical samples an hour produce the same
+    average as four -- the extra fifty-six only buy a finer answer to "which
+    minute did it go quiet", from sensors that report about once an hour
+    anyway. Power stays at a minute because its chart is read raw over an
+    hour, where the minute grid IS the content.
+    """
+    assert collector.HEARTBEAT_INTERVALS["power"] < collector.HEARTBEAT_INTERVALS["temperature"]
+
+    power_interval = collector.HEARTBEAT_INTERVALS["power"]
+    last_values = {
+        ("dev1", "power"): [100, 42.0],
+        ("dev2", "temperature"): [100, 21.4],
+    }
+    online = {"dev1": True, "dev2": True}
+
+    # One power interval after the last reading: power is due, temperature is not.
+    written = collector.heartbeat(conn, last_values, online, 100 + power_interval)
+    assert written == 1
+    assert storage.series(conn, "dev1", "power", 0) == [(100 + power_interval, 42.0)]
+    assert storage.series(conn, "dev2", "temperature", 0) == []
 
 
 def test_second_heartbeat_immediately_after_the_first_writes_nothing(conn):
     last_values = {("dev1", "power"): [100, 42.0]}
     online = {"dev1": True}
-    now = 100 + collector.HEARTBEAT_SECONDS
+    now = 100 + collector.HEARTBEAT_INTERVALS["power"]
     assert collector.heartbeat(conn, last_values, online, now) == 1
     assert collector.heartbeat(conn, last_values, online, now) == 0
     assert storage.series(conn, "dev1", "power", 0) == [(now, 42.0)]
@@ -199,7 +221,7 @@ def test_heartbeat_treats_a_non_boolean_online_value_as_offline(conn):
     # it, since e.g. "yes" and 1 are both truthy in Python.
     last_values = {("dev1", "power"): [100, 42.0]}
     online = {"dev1": "yes"}
-    written = collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_SECONDS)
+    written = collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_INTERVALS["power"])
     assert written == 0
     assert storage.series(conn, "dev1", "power", 0) == []
 
@@ -211,12 +233,12 @@ def test_record_populates_last_values_so_a_push_resets_the_clock(conn):
 
     online = {"dev1": True}
     # Not yet stale relative to the push's own timestamp.
-    assert collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_SECONDS - 1) == 0
+    assert collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_INTERVALS["power"] - 1) == 0
     # Stale now.
-    assert collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_SECONDS) == 1
+    assert collector.heartbeat(conn, last_values, online, 100 + collector.HEARTBEAT_INTERVALS["power"]) == 1
     assert storage.series(conn, "dev1", "power", 0) == [
         (100, 90.9),
-        (100 + collector.HEARTBEAT_SECONDS, 90.9),
+        (100 + collector.HEARTBEAT_INTERVALS["power"], 90.9),
     ]
 
 

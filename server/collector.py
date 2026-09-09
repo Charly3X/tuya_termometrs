@@ -20,21 +20,37 @@ from tuya_sharing.mq import SharingMQ
 
 log = logging.getLogger("collector")
 
-# How often a heartbeat "still the same" row is written for a metric that has
-# gone quiet, and which metrics get one.
+# Every charted quantity needs a heartbeat, because each can sit unchanged for
+# a long time while Tuya sends only changes. Power holds a constant 0 whenever
+# a compressor stops or nothing is plugged in; the thermometers are worse, as
+# they report only past a threshold of roughly half a degree and produced four
+# or five readings a day.
 #
-# Every charted quantity needs this, because every one of them can sit
-# unchanged for a long time and Tuya only sends changes. Power holds a
-# constant 0 whenever a compressor stops or nothing is plugged in. The
-# thermometers are worse: they only report past a threshold of roughly half a
-# degree, so measured over a real day they produced four or five readings each
-# -- an hour-long chart was simply empty and a day-long one was a four-segment
-# zigzag.
+# Battery is left out on purpose: it is not charted and it moves over days.
+# How often the loop wakes up. Must be no coarser than the smallest interval
+# below, since a metric can only be refreshed on a tick.
+TICK_SECONDS = 60
+
+# How stale a metric may get before a "still the same" row is written, per
+# metric. Not one number, because the two kinds of chart ask for different
+# things.
 #
-# Battery is left out on purpose: it is not charted, and it moves so slowly
-# that a row a minute would be pure landfill.
-HEARTBEAT_SECONDS = 60
-HEARTBEAT_METRICS = ("power", "temperature", "humidity")
+# Power is read raw on an hour-long chart, so a minute is the resolution that
+# view is made of.
+#
+# Temperature and humidity are averaged into hourly points before they are
+# drawn, and sixty identical samples in an hour produce exactly the same
+# average as four. The extra fifty-six buy only a finer answer to "which
+# minute did the sensor go quiet", and these sensors report about once an
+# hour on their own, so minute-precision detection is not worth 15x the rows:
+# measured, the sensor half of the heartbeat was about 8600 rows a day
+# against 4000 for the whole thing at this setting.
+HEARTBEAT_INTERVALS = {
+    "power": 60,
+    "temperature": 900,
+    "humidity": 900,
+}
+HEARTBEAT_METRICS = tuple(HEARTBEAT_INTERVALS)
 
 # Guards every read-modify-write of a `last_values` map shared between the
 # MQTT callback thread (_PushListener, via record()) and the main thread
@@ -132,12 +148,12 @@ def heartbeat(conn, last_values, online, now):
         for device_id, is_online in online.items():
             if is_online is not True:
                 continue
-            for metric in HEARTBEAT_METRICS:
+            for metric, interval in HEARTBEAT_INTERVALS.items():
                 entry = last_values.get((device_id, metric))
                 if entry is None:
                     continue
                 ts, value = entry
-                if now - ts < HEARTBEAT_SECONDS:
+                if now - ts < interval:
                     continue
                 written += storage.write(conn, now, device_id, {metric: value})
                 entry[0] = now
@@ -278,7 +294,7 @@ def run(settings_dict, device_ids):
     # The shadow poll stays on its own, much longer poll_interval (900s by
     # default) -- these sensors were measured reporting every 20-45 minutes,
     # so polling faster buys no resolution, only extra API calls. The loop
-    # itself now ticks every HEARTBEAT_SECONDS so the heartbeat can run on
+    # itself now ticks every TICK_SECONDS so the heartbeat can run on
     # its own, tighter cadence without changing that.
     interval = settings_dict["server"]["poll_interval"]
     seen = {}
@@ -322,7 +338,7 @@ def run(settings_dict, device_ids):
         if last_poll is None or now - last_poll >= interval:
             poll_once(api, conn, poll_ids, scales, seen, last_values)
             last_poll = now
-        time.sleep(HEARTBEAT_SECONDS)
+        time.sleep(TICK_SECONDS)
 
 
 if __name__ == "__main__":
