@@ -197,6 +197,63 @@ def test_fetch_summary_failure_leaves_the_metric_out_of_summaries(monkeypatch):
     assert summaries == {}
 
 
+def test_bucket_series_are_used_unmodified_not_downsampled(monkeypatch):
+    """
+    A bucketed series is already small (an hour's worth of hourly averages
+    is a few hundred points), and running min/max downsampling on top of it
+    would draw peaks and troughs of the averages rather than the real
+    readings. get_series must hand back exactly what the server sent.
+    """
+    # More than downsample's default threshold (500 buckets, kept unchanged
+    # below len(points) <= 1000), so if get_series downsampled this anyway
+    # the test would catch it via a shorter, reshuffled result.
+    bucketed_rows = [[i * 3600, float(i)] for i in range(2000)]
+    monkeypatch.setattr(history_client, "fetch_series", lambda *a, **k: bucketed_rows)
+    monkeypatch.setattr(
+        history_client, "fetch_summary",
+        lambda *a, **k: {"min": 0.0, "avg": 999.5, "max": 1999.0, "kwh": None},
+    )
+    series, source, summaries = history_client.get_series(
+        {"history_server": "http://example", "history_timeout": 3},
+        "tok", "dev", 24, ["temperature"], bucket=3600,
+    )
+    assert series["temperature"] == bucketed_rows
+    assert source == "server"
+    # The summary still comes straight from /summary over the raw rows,
+    # unaffected by the bucket -- not recomputed from the bucketed series.
+    assert summaries["temperature"] == {"min": 0.0, "avg": 999.5, "max": 1999.0, "kwh": None}
+
+
+def test_bucket_is_forwarded_to_fetch_series(monkeypatch):
+    seen = {}
+
+    def fake_fetch_series(base_url, token, device_id, hours, metric, timeout, bucket=0):
+        seen["bucket"] = bucket
+        return [[0, 1.0]]
+
+    monkeypatch.setattr(history_client, "fetch_series", fake_fetch_series)
+    monkeypatch.setattr(history_client, "fetch_summary", lambda *a, **k: None)
+    history_client.get_series(
+        {"history_server": "http://example", "history_timeout": 3},
+        "tok", "dev", 24, ["temperature"], bucket=3600,
+    )
+    assert seen["bucket"] == 3600
+
+
+def test_no_bucket_still_downsamples_as_before(monkeypatch):
+    monkeypatch.setattr(
+        history_client, "fetch_series",
+        lambda *a, **k: [[i, float(i)] for i in range(12000)],
+    )
+    monkeypatch.setattr(history_client, "fetch_summary", lambda *a, **k: None)
+    series, source, _ = history_client.get_series(
+        {"history_server": "http://example", "history_timeout": 3},
+        "tok", "dev", 24, ["power"],
+    )
+    assert source == "server"
+    assert len(series["power"]) < 12000
+
+
 # -- get_energy --------------------------------------------------------
 
 def test_get_energy_reports_null_when_summary_has_no_points(monkeypatch):

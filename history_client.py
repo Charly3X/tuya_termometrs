@@ -29,11 +29,17 @@ def local_power(device_id, hours):
     return [[row[0], row[1]] for row in get_device_history(device_id, hours)]
 
 
-def fetch_series(base_url, token, device_id, hours, metric, timeout):
-    """[[ts, value], ...] from the server, or None if the request failed."""
-    query = urllib.parse.urlencode(
-        {"device": device_id, "metric": metric, "hours": hours}
-    )
+def fetch_series(base_url, token, device_id, hours, metric, timeout, bucket=0):
+    """[[ts, value], ...] from the server, or None if the request failed.
+
+    bucket is seconds; 0 (the default) omits the parameter entirely and gets
+    the server's raw, unbucketed rows -- the same request this always sent
+    before bucketing existed.
+    """
+    params = {"device": device_id, "metric": metric, "hours": hours}
+    if bucket:
+        params["bucket"] = bucket
+    query = urllib.parse.urlencode(params)
     request = urllib.request.Request(f"{base_url.rstrip('/')}/series?{query}")
     request.add_header("Authorization", f"Bearer {token}")
     try:
@@ -58,15 +64,24 @@ def fetch_summary(base_url, token, device_id, hours, metric, timeout):
         return None
 
 
-def get_series(settings_dict, token, device_id, hours, metrics):
+def get_series(settings_dict, token, device_id, hours, metrics, bucket=0):
     """
     (series, source, summaries).
 
-    series maps metric name to [[ts, value], ...], already downsampled for
-    drawing. source is "server", "local", "unavailable" or "empty", and is
-    returned so the widget can say which one it drew rather than silently
-    showing gappy local data that looks complete. summaries maps metric name
-    to {"min", "avg", "max", "kwh"}, with one entry for each metric that had
+    series maps metric name to [[ts, value], ...]. With bucket == 0 (the
+    default) that is the raw series, downsampled for drawing. With bucket >
+    0 the server already grouped the rows into bucket-second-wide averages
+    -- an hourly series for a sensor is a few hundred points at most, not
+    the tens of thousands downsample exists to shrink, and running min/max
+    downsampling on top of an already-averaged series would bucket a
+    bucket: the result would show peaks and troughs of the *averages*, not
+    of the real readings, which is not a thing anyone asked for. So when
+    bucket is truthy the rows are used exactly as the server returned them.
+
+    source is "server", "local", "unavailable" or "empty", and is returned
+    so the widget can say which one it drew rather than silently showing
+    gappy local data that looks complete. summaries maps metric name to
+    {"min", "avg", "max", "kwh"}, with one entry for each metric that had
     data -- a metric with nothing recorded simply has no key.
 
     "unavailable" and "empty" are kept apart on purpose. A request that never
@@ -77,9 +92,13 @@ def get_series(settings_dict, token, device_id, hours, metrics):
 
     Statistics are fetched from the server's own /summary endpoint rather
     than computed here, so they are always taken from the RAW rows rather
-    than from what got drawn. That ordering is load-bearing: downsampling
-    keeps each bucket's minimum and maximum, so a plug at 10% duty collapses
-    to an alternating 0 W / 90 W series with a mean of 45 W instead of 9 W.
+    than from what got drawn, and fetch_summary is never given a bucket --
+    it always asks for the true, ungrouped rows. That ordering is
+    load-bearing for the un-bucketed case (downsampling keeps each bucket's
+    minimum and maximum, so a plug at 10% duty collapses to an alternating
+    0 W / 90 W series with a mean of 45 W instead of 9 W) and just as much
+    for the bucketed case (an average of hourly averages is not the true
+    average, and the min/max of hourly averages hides the real extremes).
     """
     base_url = settings_dict.get("history_server") or ""
     timeout = settings_dict.get("history_timeout", 3)
@@ -92,12 +111,14 @@ def get_series(settings_dict, token, device_id, hours, metrics):
         series = {}
         summaries = {}
         for metric in metrics:
-            rows = fetch_series(base_url, token, device_id, hours, metric, timeout)
+            rows = fetch_series(
+                base_url, token, device_id, hours, metric, timeout, bucket=bucket
+            )
             if rows is None:
                 unreachable = True
                 continue
             if rows:
-                series[metric] = chart_data.downsample(rows)
+                series[metric] = rows if bucket else chart_data.downsample(rows)
                 summary = fetch_summary(base_url, token, device_id, hours, metric, timeout)
                 if summary is not None:
                     summaries[metric] = summary
